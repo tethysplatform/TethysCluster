@@ -1,26 +1,28 @@
 #!/usr/bin/env python
-# Copyright 2009-2014 Justin Riley
+# Copyright 2015
 #
-# This file is part of StarCluster.
+# This file is part of TethysCluster
+
+# TethysCluster is a modified version of StarCluster Copyright 2009-2014 Justin Riley
 #
-# StarCluster is free software: you can redistribute it and/or modify it under
+# TethysCluster is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
 # Software Foundation, either version 3 of the License, or (at your option) any
 # later version.
 #
-# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# TethysCluster is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
 # details.
 #
 # You should have received a copy of the GNU Lesser General Public License
-# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+# along with TethysCluster. If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import sys
 
 if sys.version_info < (2, 6):
-    error = "ERROR: StarCluster requires Python 2.6+ ... exiting."
+    error = "ERROR: TethysCluster requires Python 2.6+ ... exiting."
     print >> sys.stderr, error
     sys.exit(1)
 
@@ -31,8 +33,8 @@ try:
     class PyTest(TestCommand):
         user_options = TestCommand.user_options[:]
         user_options += [
-            ('live', 'L', 'Run live StarCluster tests on a real AWS account'),
-            ('coverage', 'C', 'Produce a coverage report for StarCluster'),
+            ('live', 'L', 'Run live TethysCluster tests on a real AWS account'),
+            ('coverage', 'C', 'Produce a coverage report for TethysCluster'),
         ]
 
         def initialize_options(self):
@@ -60,8 +62,8 @@ try:
             errno = pytest.main(self.test_args)
             sys.exit(errno)
 
-    console_scripts = ['starcluster = starcluster.cli:main']
-    extra = dict(test_suite="starcluster.tests",
+    console_scripts = ['tethyscluster = tethyscluster.cli:main']
+    extra = dict(test_suite="tethyscluster.tests",
                  tests_require= ["pytest-cov", "pytest-pep8", "pytest-flakes",
                                  "pytest"],
                  cmdclass={"test": PyTest},
@@ -119,25 +121,25 @@ except ImportError:
             out = [item for item in out if not fnmatchcase(item, pat)]
         return out
 
-    extra = {'scripts': ['bin/starcluster']}
+    extra = {'scripts': ['bin/tethyscluster']}
 
 VERSION = 0.9999
-static = os.path.join('starcluster', 'static.py')
+static = os.path.join('tethyscluster', 'static.py')
 execfile(static)  # pull VERSION from static.py
 
 README = open('README.rst').read()
 
 setup(
-    name='StarCluster',
+    name='TethysCluster',
     version=VERSION,
     packages=find_packages(),
-    package_data={'starcluster.templates':
+    package_data={'tethyscluster.templates':
                   ['web/*.*', 'web/css/*', 'web/js/*']},
     license='LGPL3',
     author='Justin Riley',
     author_email='justin.t.riley@gmail.com',
     url="http://star.mit.edu/cluster",
-    description="StarCluster is a utility for creating and managing computing "
+    description="TethysCluster is a utility for creating and managing computing "
     "clusters hosted on Amazon's Elastic Compute Cloud (EC2).",
     long_description=README,
     classifiers=[

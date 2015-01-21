@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# StarCluster documentation build configuration file, created by
+# TethysCluster documentation build configuration file, created by
 # sphinx-quickstart on Mon Mar  1 13:47:45 2010.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -26,7 +26,7 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage',
               'sphinx.ext.pngmath', 'sphinxcontrib.issuetracker']
 
 issuetracker = 'github'
-issuetracker_project = 'jtriley/StarCluster'
+issuetracker_project = 'jtriley/TethysCluster'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -41,7 +41,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'StarCluster'
+project = u'TethysCluster'
 copyright = u'2011, Software Tools for Academics and Researchers'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -49,7 +49,7 @@ copyright = u'2011, Software Tools for Academics and Researchers'
 # built documents.
 #
 # The short X.Y version.
-static_mod = os.path.join('..', '..', 'starcluster', 'static.py')
+static_mod = os.path.join('..', '..', 'tethyscluster', 'static.py')
 execfile(static_mod)
 version = VERSION
 # The full version, including alpha/beta/rc tags.
@@ -97,7 +97,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
-html_theme = 'starcluster'
+html_theme = 'tethyscluster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -183,7 +183,7 @@ htmlhelp_basename = 'StarClusterdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'StarCluster.tex', u'StarCluster Documentation',
+  ('index', 'TethysCluster.tex', u'TethysCluster Documentation',
    u'Justin Riley', 'manual'),
 ]
 

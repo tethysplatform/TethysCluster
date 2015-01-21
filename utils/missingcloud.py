@@ -6,7 +6,7 @@ import traceback
 
 from BeautifulSoup import BeautifulSoup as bs
 
-from starcluster import config
+from tethyscluster import config
 
 
 class MissingCloud(object):

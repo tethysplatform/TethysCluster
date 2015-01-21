@@ -94,12 +94,12 @@ __/\_____| |_ __ _ _ __ ___| |_   _ ___| |_ ___ _ __
 /_  _\__ \ || (_| | | | (__| | |_| \__ \ ||  __/ |
   \/ |___/\__\__,_|_|  \___|_|\__,_|___/\__\___|_|
 
-StarCluster Ubuntu 12.04 AMI
+TethysCluster Ubuntu 12.04 AMI
 Software Tools for Academics and Researchers (STAR)
 Homepage: http://star.mit.edu/cluster
 Documentation: http://star.mit.edu/cluster/docs/latest
-Code: https://github.com/jtriley/StarCluster
-Mailing list: starcluster@mit.edu
+Code: https://github.com/jtriley/TethysCluster
+Mailing list: tethyscluster@mit.edu
 
 This AMI Contains:
 
@@ -408,7 +408,7 @@ def install_ipython():
 def configure_motd():
     for f in glob.glob('/etc/update-motd.d/*'):
         os.unlink(f)
-    motd = open('/etc/update-motd.d/00-starcluster', 'w')
+    motd = open('/etc/update-motd.d/00-tethyscluster', 'w')
     motd.write(STARCLUSTER_MOTD)
     motd.close()
     os.chmod(motd.name, 0755)

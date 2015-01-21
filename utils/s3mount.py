@@ -2,7 +2,7 @@
 import os
 import sys
 
-from starcluster.config import StarClusterConfig
+from tethyscluster.config import StarClusterConfig
 
 print 'Simple wrapper script for s3fs (http://s3fs.googlecode.com/)'
 

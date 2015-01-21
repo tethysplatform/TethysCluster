@@ -15,7 +15,7 @@ def find_cruft(path, extensions=['.pyc', '.pyo']):
 
 def main():
     repo_root = os.path.dirname(__file__)
-    sc_src = os.path.join(repo_root, 'starcluster')
+    sc_src = os.path.join(repo_root, 'tethyscluster')
     for i in find_cruft(sc_src):
         os.unlink(i)
     for i in glob.glob('*.pyc'):

@@ -4,11 +4,11 @@ import sys
 import time
 import optparse
 
-from starcluster import config
-from starcluster import cluster
-from starcluster import spinner
-from starcluster import exception
-from starcluster import logger
+from tethyscluster import config
+from tethyscluster import cluster
+from tethyscluster import spinner
+from tethyscluster import exception
+from tethyscluster import logger
 logger.configure_sc_logging()
 log = logger.log
 
@@ -90,14 +90,14 @@ def deploy_img(img_path, vol_size, arch, region, src_ami, dev=None,
     xarch = arch
     if xarch == 'i386':
         xarch = 'x86'
-    snapdesc = 'StarCluster %s %s EBS AMI Snapshot' % (platform, xarch)
+    snapdesc = 'TethysCluster %s %s EBS AMI Snapshot' % (platform, xarch)
     snap = ec2.create_snapshot(vol, description=snapdesc,
                                wait_for_snapshot=True)
     vol.delete()
     bmap = ec2.create_root_block_device_map(snap.id, add_ephemeral_drives=True)
     imgname = platform.replace(' ', '-').lower()
-    imgname = 'starcluster-base-%s-%s' % (imgname, xarch)
-    imgdesc = 'StarCluster Base %s %s (%s)' % (platform, xarch, region.upper())
+    imgname = 'tethyscluster-base-%s-%s' % (imgname, xarch)
+    imgdesc = 'TethysCluster Base %s %s (%s)' % (platform, xarch, region.upper())
     oldimg = ec2.get_images(filters=dict(name=imgname))
     if oldimg:
         oldimg = oldimg[0]

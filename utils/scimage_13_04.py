@@ -62,7 +62,7 @@ BUILD_UTILS_PKGS += "python-distutils-extra gfortran unzip unace cdbs patch "
 GRID_SCHEDULER_GIT = 'git://github.com/jtriley/gridscheduler.git'
 CLOUDERA_ARCHIVE_KEY = 'http://archive.cloudera.com/debian/archive.key'
 CLOUDERA_APT = 'http://archive.cloudera.com/debian squeeze-cdh3u5 contrib'
-PPAS = ["ppa:staticfloat/julia-deps", "ppa:justin-t-riley/starcluster",
+PPAS = ["ppa:staticfloat/julia-deps", "ppa:justin-t-riley/tethyscluster",
         "ppa:staticfloat/julianightlies"]
 STARCLUSTER_MOTD = """\
 #!/bin/sh
@@ -73,11 +73,11 @@ __/\_____| |_ __ _ _ __ ___| |_   _ ___| |_ ___ _ __
 /_  _\__ \ || (_| | | | (__| | |_| \__ \ ||  __/ |
   \/ |___/\__\__,_|_|  \___|_|\__,_|___/\__\___|_|
 
-StarCluster Ubuntu 13.04 AMI
+TethysCluster Ubuntu 13.04 AMI
 Software Tools for Academics and Researchers (STAR)
 Homepage: http://star.mit.edu/cluster
 Documentation: http://star.mit.edu/cluster/docs/latest
-Code: https://github.com/jtriley/StarCluster
+Code: https://github.com/jtriley/TethysCluster
 Mailing list: http://star.mit.edu/cluster/mailinglist.html
 
 This AMI Contains:
@@ -389,7 +389,7 @@ def install_julia():
 def configure_motd():
     for f in glob.glob('/etc/update-motd.d/*'):
         os.unlink(f)
-    motd = open('/etc/update-motd.d/00-starcluster', 'w')
+    motd = open('/etc/update-motd.d/00-tethyscluster', 'w')
     motd.write(STARCLUSTER_MOTD)
     motd.close()
     os.chmod(motd.name, 0755)

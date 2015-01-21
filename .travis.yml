@@ -9,7 +9,7 @@ script:
     - python setup.py test --coverage
 notifications:
   irc:
-    channels: "irc.freenode.org#starcluster"
+    channels: "irc.freenode.org#tethyscluster"
     on_success: change
     on_failure: change
     use_notice: true

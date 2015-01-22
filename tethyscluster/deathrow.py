@@ -33,7 +33,7 @@ def _load_plugins(plugins, debug=True):
     Currently used to provide backwards compatibility for the plugin kwarg for
     Cluster. Cluster now expects the plugins kwarg to be a list of plugin
     objects not a list of dicts. This should be merged into
-    StarClusterConfig._load_plugins in a future release after warning about the
+    TethysClusterConfig._load_plugins in a future release after warning about the
     change in a previous release.
     """
     plugs = []

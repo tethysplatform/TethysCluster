@@ -28,7 +28,7 @@ from tethyscluster.balancers import LoadBalancer
 from tethyscluster.logger import log
 
 
-SGE_STATS_DIR = os.path.join(static.STARCLUSTER_CFG_DIR, 'sge')
+SGE_STATS_DIR = os.path.join(static.TETHYSCLUSTER_CFG_DIR, 'sge')
 DEFAULT_STATS_DIR = os.path.join(SGE_STATS_DIR, '%s')
 DEFAULT_STATS_FILE = os.path.join(DEFAULT_STATS_DIR, 'sge-stats.csv')
 

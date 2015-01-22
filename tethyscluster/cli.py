@@ -45,7 +45,7 @@ Please submit bug reports to tethyscluster@mit.edu
 """ % __version__
 
 
-class StarClusterCLI(object):
+class TethysClusterCLI(object):
     """
     TethysCluster Command Line Interface
     """
@@ -84,9 +84,9 @@ class StarClusterCLI(object):
         if gopts.DEBUG:
             console.setLevel(logger.DEBUG)
             config.DEBUG_CONFIG = True
-        # load StarClusterConfig into global options
+        # load TethysClusterConfig into global options
         try:
-            cfg = config.StarClusterConfig(gopts.CONFIG)
+            cfg = config.TethysClusterConfig(gopts.CONFIG)
             cfg.load()
         except exception.ConfigNotFound, e:
             log.error(e.msg)
@@ -140,7 +140,7 @@ class StarClusterCLI(object):
         gparser.add_option("-c", "--config", dest="CONFIG", action="store",
                            metavar="FILE",
                            help="use alternate config file (default: %s)" %
-                           static.STARCLUSTER_CFG_FILE)
+                           static.TETHYSCLUSTER_CFG_FILE)
         gparser.add_option("-r", "--region", dest="REGION", action="store",
                            help="specify a region to use (default: us-east-1)")
         gparser.disable_interspersed_args()
@@ -236,10 +236,10 @@ class StarClusterCLI(object):
             self._init_completion()
             # fetch the global options
             gopts = self.get_global_opts()
-            # try to load StarClusterConfig into global options
+            # try to load TethysClusterConfig into global options
             if gopts:
                 try:
-                    cfg = config.StarClusterConfig(gopts.CONFIG)
+                    cfg = config.TethysClusterConfig(gopts.CONFIG)
                     cfg.load()
                 except exception.ConfigError:
                     cfg = None
@@ -329,7 +329,7 @@ def main():
         static.create_sc_config_dirs()
         logger.configure_sc_logging()
         warn_debug_file_moved()
-        StarClusterCLI().main()
+        TethysClusterCLI().main()
     except KeyboardInterrupt:
         print "Interrupted, exiting."
         sys.exit(1)

@@ -17,7 +17,7 @@
 
 import sys
 from tethyscluster import static
-sys.path.insert(0, static.STARCLUSTER_PLUGIN_DIR)
+sys.path.insert(0, static.TETHYSCLUSTER_PLUGIN_DIR)
 
 __version__ = static.VERSION
 __author__ = "Justin Riley (justin.t.riley@gmail.com)"

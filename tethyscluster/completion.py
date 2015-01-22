@@ -69,7 +69,7 @@ from optcomplete import RegexCompleter
 
 from tethyscluster import static
 
-debugfn = os.path.join(static.STARCLUSTER_LOG_DIR, 'completion-debug.log')
+debugfn = os.path.join(static.TETHYSCLUSTER_LOG_DIR, 'completion-debug.log')
 
 
 def autocomplete(parser,

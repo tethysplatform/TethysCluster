@@ -33,7 +33,7 @@ from tethyscluster.clustersetup import DefaultClusterSetup
 
 from tethyscluster.logger import log
 
-IPCLUSTER_CACHE = os.path.join(static.STARCLUSTER_CFG_DIR, 'ipcluster')
+IPCLUSTER_CACHE = os.path.join(static.TETHYSCLUSTER_CFG_DIR, 'ipcluster')
 CHANNEL_NAMES = (
     "control",
     "task",

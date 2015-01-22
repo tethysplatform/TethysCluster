@@ -24,7 +24,7 @@ from tethyscluster import exception
 from tethyscluster import threadpool
 
 
-class TestThreadPool(tests.StarClusterTest):
+class TestThreadPool(tests.TethysClusterTest):
 
     _jobs = 5
     _mykw = 'TethysCluster!!!'

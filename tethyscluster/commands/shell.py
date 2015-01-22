@@ -36,7 +36,7 @@ class CmdShell(CmdBase):
 
     The following objects are automatically available at the prompt:
 
-        cfg - tethyscluster.config.StarClusterConfig instance
+        cfg - tethyscluster.config.TethysClusterConfig instance
         cm - tethyscluster.cluster.ClusterManager instance
         ec2 - tethyscluster.awsutils.EasyEC2 instance
         s3 - tethyscluster.awsutils.EasyS3 instance
@@ -101,7 +101,7 @@ class CmdShell(CmdBase):
 
     def execute(self, args):
         local_ns = dict(cfg=self.cfg, ec2=self.ec2, s3=self.s3, cm=self.cm,
-                        starcluster=tethyscluster, log=log)
+                        tethyscluster=tethyscluster, log=log)
         if self.opts.ipcluster:
             log.info("Loading parallel IPython library")
             try:
@@ -114,7 +114,7 @@ class CmdShell(CmdBase):
             tag = self.opts.ipcluster
             cl = self.cm.get_cluster(tag)
             region = cl.master_node.region.name
-            ipcluster_dir = os.path.join(static.STARCLUSTER_CFG_DIR,
+            ipcluster_dir = os.path.join(static.TETHYSCLUSTER_CFG_DIR,
                                          'ipcluster')
             local_json = os.path.join(ipcluster_dir,
                                       "%s-%s.json" % (tag, region))

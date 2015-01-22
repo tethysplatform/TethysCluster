@@ -30,7 +30,7 @@ class CreateUsers(clustersetup.DefaultClusterSetup):
     Plugin for creating one or more cluster users
     """
 
-    DOWNLOAD_KEYS_DIR = os.path.join(static.STARCLUSTER_CFG_DIR, 'user_keys')
+    DOWNLOAD_KEYS_DIR = os.path.join(static.TETHYSCLUSTER_CFG_DIR, 'user_keys')
     BATCH_USER_FILE = "/root/.users/users.txt"
 
     def __init__(self, num_users=None, usernames=None, download_keys=None,

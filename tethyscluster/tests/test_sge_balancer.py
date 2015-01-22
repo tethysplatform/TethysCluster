@@ -20,11 +20,11 @@ import datetime
 
 from tethyscluster import utils
 from tethyscluster.balancers import sge
-from tethyscluster.tests import StarClusterTest
+from tethyscluster.tests import TethysClusterTest
 from tethyscluster.tests.templates import sge_balancer
 
 
-class TestSGELoadBalancer(StarClusterTest):
+class TestSGELoadBalancer(TethysClusterTest):
 
     def test_qhost_parser(self):
         stat = sge.SGEStats()

@@ -886,7 +886,7 @@ def test_create_keypair_fingerprint(keypair=None):
     TODO: move this to 'live' tests
     """
     from tethyscluster import config
-    cfg = config.StarClusterConfig().load()
+    cfg = config.TethysClusterConfig().load()
     ec2 = cfg.get_easy_ec2()
     if keypair is None:
         keypair = cfg.keys.keys()[0]
@@ -903,7 +903,7 @@ def test_import_keypair_fingerprint(keypair):
     TODO: move this to 'live' tests
     """
     from tethyscluster import config
-    cfg = config.StarClusterConfig().load()
+    cfg = config.TethysClusterConfig().load()
     ec2 = cfg.get_easy_ec2()
     key_location = cfg.get_key(keypair).key_location
     localfprint = get_public_rsa_fingerprint(key_location)

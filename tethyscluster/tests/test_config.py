@@ -29,7 +29,7 @@ from tethyscluster import config
 from tethyscluster import utils
 
 
-class TestStarClusterConfig(tests.StarClusterTest):
+class TestTethysClusterConfig(tests.StarClusterTest):
 
     def test_valid_config_template(self):
         self.config
@@ -40,7 +40,7 @@ class TestStarClusterConfig(tests.StarClusterTest):
         tmp_file.close()
         assert not os.path.exists(non_existent_file)
         try:
-            config.StarClusterConfig(non_existent_file, cache=True).load()
+            config.TethysClusterConfig(non_existent_file, cache=True).load()
         except exception.ConfigNotFound:
             pass
         else:
@@ -235,7 +235,7 @@ class TestStarClusterConfig(tests.StarClusterTest):
             "<html>random garbage file with no section headings</html>")
         tmp_file.flush()
         try:
-            config.StarClusterConfig(tmp_file.name, cache=True).load()
+            config.TethysClusterConfig(tmp_file.name, cache=True).load()
         except exception.ConfigHasNoSections:
             pass
         else:
@@ -251,7 +251,7 @@ class TestStarClusterConfig(tests.StarClusterTest):
         os.environ['AWS_ACCESS_KEY_ID'] = aws_key
         os.environ['AWS_SECRET_ACCESS_KEY'] = aws_secret_key
         tmp_file = tempfile.NamedTemporaryFile()
-        cfg = config.StarClusterConfig(tmp_file.name, cache=True).load()
+        cfg = config.TethysClusterConfig(tmp_file.name, cache=True).load()
         assert cfg.aws['aws_access_key_id'] == aws_key
         assert cfg.aws['aws_secret_access_key'] == aws_secret_key
         del os.environ['AWS_ACCESS_KEY_ID']

@@ -2260,8 +2260,8 @@ class ClusterValidator(validators.Validator):
 
 
 if __name__ == "__main__":
-    from tethyscluster.config import StarClusterConfig
-    cfg = StarClusterConfig().load()
+    from tethyscluster.config import TethysClusterConfig
+    cfg = TethysClusterConfig().load()
     sc = cfg.get_cluster_template('smallcluster', 'mynewcluster')
     if sc.is_valid():
         sc.start(create=True)

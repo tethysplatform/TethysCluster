@@ -89,7 +89,7 @@ class CmdBase(completion.CmdComplete):
     @property
     def cfg(self):
         """
-        Get global StarClusterConfig object
+        Get global TethysClusterConfig object
         """
         if not self._cfg:
             self._cfg = self.goptions_dict.get('CONFIG')

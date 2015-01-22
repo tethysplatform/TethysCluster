@@ -954,7 +954,7 @@ class EasyEC2(EasyAWS):
 
     def list_starcluster_public_images(self):
         images = self.conn.get_all_images(owners=[static.STARCLUSTER_OWNER_ID])
-        log.info("Listing all public TethysCluster images...")
+        log.info("Listing all public StarCluster images...")
         imgs = [img for img in images if img.is_public]
 
         def sc_public_sort(obj):

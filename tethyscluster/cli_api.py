@@ -4,7 +4,7 @@ import sys, optparse
 
 #TODO add ability to add custom config
 
-class StarCluster(object):
+class TethysCluster(object):
 
     @classmethod
     def add_method(cls, method_name, subcmd):
@@ -17,9 +17,9 @@ class StarCluster(object):
         setattr(cls, method_name, method)
 
     def __init__(self):
-        starcluster_cli = cli.StarClusterCLI()
-        gparser = starcluster_cli.gparser
-        subcmds_map = starcluster_cli.subcmds_map
+        tethyscluster_cli = cli.TethysClusterCLI()
+        gparser = tethyscluster_cli.gparser
+        subcmds_map = tethyscluster_cli.subcmds_map
 
         gopts, args = gparser.parse_args()
 
@@ -27,9 +27,9 @@ class StarCluster(object):
         if gopts.DEBUG:
             console.setLevel(logger.DEBUG)
             config.DEBUG_CONFIG = True
-        # load StarClusterConfig into global options
+        # load TethysClusterConfig into global options
         try:
-            cfg = config.StarClusterConfig(gopts.CONFIG)
+            cfg = config.TethysClusterConfig(gopts.CONFIG)
             cfg.load()
         except exception.ConfigNotFound, e:
             log.error(e.msg)
@@ -48,4 +48,4 @@ class StarCluster(object):
             subcmd.gparser = gparser
             subcmd.subcmds_map = subcmds_map
             subcmd.addopts(lparser)
-            StarCluster.add_method(subcmd_name, subcmd)
+            TethysCluster.add_method(subcmd_name, subcmd)

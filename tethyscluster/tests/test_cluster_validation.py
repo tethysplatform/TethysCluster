@@ -20,10 +20,10 @@ import tempfile
 
 from tethyscluster import exception
 from tethyscluster.cluster import Cluster
-from tethyscluster.tests import StarClusterTest
+from tethyscluster.tests import TethysClusterTest
 
 
-class TestClusterValidation(StarClusterTest):
+class TestClusterValidation(TethysClusterTest):
 
     def test_plugin_loading(self):
         # default test template should have valid plugins by default

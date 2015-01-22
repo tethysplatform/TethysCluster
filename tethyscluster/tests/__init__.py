@@ -18,11 +18,11 @@
 import unittest
 import tempfile
 
-from tethyscluster.config import StarClusterConfig
+from tethyscluster.config import TethysClusterConfig
 from tethyscluster.tests.templates import config
 
 
-class StarClusterTest(unittest.TestCase):
+class TethysClusterTest(unittest.TestCase):
 
     __cfg = None
 
@@ -33,14 +33,14 @@ class StarClusterTest(unittest.TestCase):
             tmp_file = tempfile.NamedTemporaryFile()
             tmp_file.write(config.config_test_template % config.default_config)
             tmp_file.flush()
-            self.__cfg = StarClusterConfig(tmp_file.name, cache=True).load()
+            self.__cfg = TethysClusterConfig(tmp_file.name, cache=True).load()
         return self.__cfg
 
     def get_config(self, contents, cache=False):
         tmp_file = tempfile.NamedTemporaryFile()
         tmp_file.write(contents)
         tmp_file.flush()
-        cfg = StarClusterConfig(tmp_file.name, cache=cache).load()
+        cfg = TethysClusterConfig(tmp_file.name, cache=cache).load()
         return cfg
 
     def get_custom_config(self, **kwargs):

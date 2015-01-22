@@ -126,13 +126,13 @@ class NullHandler(logging.Handler):
         pass
 
 
-def get_starcluster_logger():
+def get_tethyscluster_logger():
     log = logging.getLogger('tethyscluster')
     log.addHandler(NullHandler())
     return log
 
 
-log = get_starcluster_logger()
+log = get_tethyscluster_logger()
 console = ConsoleLogger()
 
 

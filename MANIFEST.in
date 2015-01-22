@@ -9,4 +9,4 @@ recursive-include docs *
 recursive-exclude docs/sphinx/_build *
 recursive-include utils *
 recursive-include completion *
-recursive-include starcluster/templates/web *
+recursive-include tethyscluster/templates/web *

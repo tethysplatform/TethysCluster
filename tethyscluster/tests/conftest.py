@@ -58,7 +58,7 @@ def keypair(ec2, config):
 
 @pytest.fixture(scope="module")
 def config():
-    cfg = sconfig.StarClusterConfig().load()
+    cfg = sconfig.TethysClusterConfig().load()
     assert cfg.aws.aws_access_key_id
     assert cfg.aws.aws_secret_access_key
     return cfg
@@ -114,7 +114,7 @@ def subnet(ec2, vpc, gw):
 def ami(ec2):
     img = ec2.conn.get_all_images(
         filters={'owner_id': static.STARCLUSTER_OWNER_ID,
-                 'name': 'tethyscluster-base-ubuntu-13.04-x86_64'})
+                 'name': 'starcluster-base-ubuntu-13.04-x86_64'})
     assert len(img) == 1
     return img[0]
 

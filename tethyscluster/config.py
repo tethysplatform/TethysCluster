@@ -64,20 +64,20 @@ def get_cluster_manager(config_file=None, cache=False):
 
 
 def get_config(config_file=None, cache=False):
-    """Factory for StarClusterConfig object"""
-    return StarClusterConfig(config_file, cache).load()
+    """Factory for TethysClusterConfig object"""
+    return TethysClusterConfig(config_file, cache).load()
 
 
-class StarClusterConfig(object):
+class TethysClusterConfig(object):
     """
     Loads TethysCluster configuration settings defined in config_file
-    which defaults to ~/.starclustercfg
+    which defaults to ~/.tethyscluster
 
     Settings are available as follows:
 
-    cfg = StarClusterConfig()
+    cfg = TethysClusterConfig()
     or
-    cfg = StarClusterConfig('/path/to/my/config.cfg')
+    cfg = TethysClusterConfig('/path/to/my/config.cfg')
     cfg.load()
     aws_info = cfg.aws
     cluster_cfg = cfg.clusters['mycluster']
@@ -98,8 +98,8 @@ class StarClusterConfig(object):
 
     def __init__(self, config_file=None, cache=False):
         self.cfg_file = config_file \
-            or os.environ.get('STARCLUSTER_CONFIG') \
-            or static.STARCLUSTER_CFG_FILE
+            or os.environ.get('TETHYSCLUSTER_CONFIG') \
+            or static.TETHYSCLUSTER_CFG_FILE
         self.cfg_file = os.path.expanduser(self.cfg_file)
         self.cfg_file = os.path.expandvars(self.cfg_file)
         self.type_validators = {
@@ -120,7 +120,7 @@ class StarClusterConfig(object):
         self.cache = cache
 
     def __repr__(self):
-        return "<StarClusterConfig: %s>" % self.cfg_file
+        return "<TethysClusterConfig: %s>" % self.cfg_file
 
     def _get_urlfp(self, url):
         log.debug("Loading url: %s" % url)
@@ -741,7 +741,7 @@ class InlineCommentsIgnoredConfigParser(ConfigParser.ConfigParser):
 
 if __name__ == "__main__":
     from pprint import pprint
-    cfg = StarClusterConfig().load()
+    cfg = TethysClusterConfig().load()
     pprint(cfg.aws)
     pprint(cfg.clusters)
     pprint(cfg.keys)

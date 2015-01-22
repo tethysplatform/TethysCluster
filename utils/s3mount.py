@@ -2,11 +2,11 @@
 import os
 import sys
 
-from tethyscluster.config import StarClusterConfig
+from tethyscluster.config import TethysClusterConfig
 
 print 'Simple wrapper script for s3fs (http://s3fs.googlecode.com/)'
 
-cfg = StarClusterConfig().load()
+cfg = TethysClusterConfig().load()
 ec2 = cfg.get_easy_ec2()
 buckets = ec2.s3.get_buckets()
 counter = 0

@@ -1,6 +1,8 @@
-# Copyright 2009-2014 Justin Riley
+# Copyright 2015 Scott Christensen
 #
-# This file is part of TethysCluster.
+# This file is part of TethysCluster
+#
+# TethysCluster is a modified version of StarCluster (Copyright 2009-2014 Justin Riley)
 #
 # TethysCluster is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -55,7 +57,7 @@ def create_sc_config_dirs():
     __makedirs(TETHYSCLUSTER_LOG_DIR)
 
 
-VERSION = "0.95.6"
+VERSION = "0.0.0"
 PID = os.getpid()
 TMP_DIR = tempfile.gettempdir()
 if os.path.exists("/tmp"):
@@ -85,7 +87,7 @@ BASE_AMI_32 = "ami-9bf9c9f2"
 BASE_AMI_64 = "ami-3393a45a"
 BASE_AMI_HVM = "ami-6b211202"
 
-SECURITY_GROUP_PREFIX = "@sc-"
+SECURITY_GROUP_PREFIX = "@tc-"
 SECURITY_GROUP_TEMPLATE = SECURITY_GROUP_PREFIX + "%s"
 VOLUME_GROUP_NAME = "volumecreator"
 VOLUME_GROUP = SECURITY_GROUP_PREFIX + VOLUME_GROUP_NAME

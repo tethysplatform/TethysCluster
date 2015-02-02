@@ -601,7 +601,7 @@ class TethysClusterConfig(object):
         return found
 
     def get_cluster_template(self, template_name, tag_name=None,
-                             ec2_conn=None):
+                             ec2_conn=None, **kwargs):
         """
         Returns Cluster instance configured with the settings in the
         config file.
@@ -611,7 +611,7 @@ class TethysClusterConfig(object):
         tag_name if not specified will be set to template_name
         """
         try:
-            kwargs = {}
+            # kwargs = {}
             tag_name = tag_name or template_name
             kwargs.update(dict(cluster_tag=tag_name))
             kwargs.update(self.clusters[template_name])

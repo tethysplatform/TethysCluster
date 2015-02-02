@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-# Copyright 2015
+# Copyright 2015 Scott Christensen
 #
 # This file is part of TethysCluster
-
-# TethysCluster is a modified version of StarCluster Copyright 2009-2014 Justin Riley
+#
+# TethysCluster is a modified version of StarCluster (Copyright 2009-2014 Justin Riley)
 #
 # TethysCluster is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -124,7 +124,8 @@ except ImportError:
     extra = {'scripts': ['bin/tethyscluster']}
 
 VERSION = 0.9999
-static = os.path.join('tethyscluster', 'static.py')
+basedir = os.path.dirname(__file__)
+static = os.path.join(basedir, 'tethyscluster', 'static.py')
 execfile(static)  # pull VERSION from static.py
 
 README = open('README.rst').read()
@@ -136,10 +137,10 @@ setup(
     package_data={'tethyscluster.templates':
                   ['web/*.*', 'web/css/*', 'web/js/*']},
     license='LGPL3',
-    author='Justin Riley',
-    author_email='justin.t.riley@gmail.com',
-    url="http://star.mit.edu/cluster",
-    description="TethysCluster is a utility for creating and managing computing "
+    author='Scott Christensen',
+    author_email='sdc50@byu.net',
+    url="",
+    description="TethysCluster is an adaptation of StarCluster, a utility for creating and managing computing "
     "clusters hosted on Amazon's Elastic Compute Cloud (EC2).",
     long_description=README,
     classifiers=[

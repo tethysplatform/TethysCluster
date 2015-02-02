@@ -96,7 +96,7 @@ class ClusterManager(managers.Manager):
         """
         return self.cfg.get_default_cluster_template()
 
-    def get_cluster_template(self, template_name, tag_name=None):
+    def get_cluster_template(self, template_name, tag_name=None, **kwargs):
         """
         Returns a new Cluster object using the settings from the cluster
         template template_name
@@ -105,12 +105,12 @@ class ClusterManager(managers.Manager):
         be set to tag_name
         """
         cl = self.cfg.get_cluster_template(template_name, tag_name=tag_name,
-                                           ec2_conn=self.ec2)
+                                           ec2_conn=self.ec2, **kwargs)
         return cl
 
-    def get_default_template_cluster(self, tag_name=None):
+    def get_default_template_cluster(self, tag_name=None, **kwargs):
         template_cluster = self.get_default_cluster_template()
-        return self.get_cluster_template(template_cluster, tag_name)
+        return self.get_cluster_template(template_cluster, tag_name, **kwargs)
 
     def get_cluster_or_none(self, cluster_name, **kwargs):
         """
@@ -1685,7 +1685,7 @@ class Cluster(object):
         second element is the plugin object (a subclass of ClusterSetup)
         """
         plugs = [self._default_plugin]
-        self.disable_queue = True
+        self.disable_queue = True #added this line to prevent sge from being installed
         if not self.disable_queue:
             plugs.append(self._sge_plugin)
         plugs += (plugins or self.plugins)[:]
@@ -1698,11 +1698,11 @@ class Cluster(object):
         """
         Run a TethysCluster plugin.
 
-        plugin - an instance of the plugin's class
+        plugin - an instance of the plugin's class (ClusterSetup)
         name - a user-friendly label for the plugin
         method_name - the method to run within the plugin (default: "run")
         node - optional node to pass as first argument to plugin method (used
-        for on_add_node/on_remove_node)
+               for on_add_node/on_remove_node)
         """
         plugin_name = name or getattr(plugin, '__name__',
                                       utils.get_fq_class_name(plugin))

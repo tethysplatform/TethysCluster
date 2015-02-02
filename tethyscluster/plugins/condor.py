@@ -19,7 +19,7 @@ from tethyscluster import clustersetup
 from tethyscluster.templates import condor
 from tethyscluster.logger import log
 
-CONDOR_CFG = '/etc/condor/config.d/40starcluster'
+CONDOR_CFG = '/etc/condor/config.d/40tethyscluster'
 FS_REMOTE_DIR = '/home/._condor_tmp'
 
 

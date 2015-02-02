@@ -39,9 +39,8 @@ from tethyscluster.logger import log, console
 from tethyscluster import __version__
 
 __description__ = """
-TethysCluster - (http://star.mit.edu/cluster) (v. %s)
-Software Tools for Academics and Researchers (STAR)
-Please submit bug reports to tethyscluster@mit.edu
+TethysCluster - (https://github.com/CI-WATER/TethysCluster/wiki) (v. %s)
+An adaptation of StarCluster (http://star.mit.edu/cluster)
 """ % __version__
 
 
@@ -183,8 +182,8 @@ class TethysClusterCLI(object):
         print
         log.error("Oops! Looks like you've found a bug in TethysCluster")
         log.error("Crash report written to: %s" % static.CRASH_FILE)
-        log.error("Please remove any sensitive data from the crash report")
-        log.error("and submit it to tethyscluster@mit.edu")
+        # log.error("Please remove any sensitive data from the crash report")
+        # log.error("and submit it to tethyscluster@mit.edu")
         sys.exit(1)
 
     def get_global_opts(self):

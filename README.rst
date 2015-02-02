@@ -7,8 +7,6 @@ TethysCluster v0.0.0
 :Team: CI-Water
 :Homepage: http://ci-water.org
 :License: LGPL
-.. image:: https://pypip.in/d/StarCluster/badge.png
-  :target: https://crate.io/packages/StarCluster
 
 Description:
 ============
@@ -22,7 +20,6 @@ service to create and destroy clusters of Linux virtual machines on demand.
 
 For more information about the StarCluster project see https://star.mit.edu/cluster/
 
-http://webchat.freenode.net/?channels=starcluster
 
 Licensing
 =========

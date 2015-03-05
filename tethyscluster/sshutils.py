@@ -30,6 +30,7 @@ import posixpath
 
 import scp
 import paramiko
+paramiko.util.log_to_file('logs/paramiko.log')
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
 
@@ -266,7 +267,6 @@ class SSHClient(object):
         mode specifies unix permissions to apply to the new dir
         """
         try:
-            print path, mode
             return self.sftp.mkdir(path, mode)
         except IOError as e:
             print str(e)
@@ -350,6 +350,7 @@ class SSHClient(object):
         Set user (uid) and group (gid) owner for remote_path
         """
         return self.sftp.chown(remote_path, uid, gid)
+        #return self.execute('chown %s:%s %s' % (uid, gid, remote_path))
 
     def chmod(self, mode, remote_path):
         """

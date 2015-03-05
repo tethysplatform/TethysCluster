@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with TethysCluster. If not, see <http://www.gnu.org/licenses/>.
 
-condor_tmpl = """\
+condor_linux_tmpl = """\
 LOCAL_CONFIG_FILE =
 LOCAL_CONFIG_DIR = /etc/condor/config.d
 LOCAL_DIR = /var/lib/condor
@@ -48,4 +48,25 @@ DedicatedScheduler = "DedicatedScheduler@$(CONDOR_HOST)"
 STARTD_ATTRS = $(STARTD_ATTRS), DedicatedScheduler
 SEC_DEFAULT_AUTHENTICATION_METHODS = FS, KERBEROS, GSI, FS_REMOTE
 FS_REMOTE_DIR = %(FS_REMOTE_DIR)s
+"""
+
+condor_windows_tmpl = """\
+CONDOR_HOST = %(CONDOR_HOST)s
+UID_DOMAIN      = $(CONDOR_HOST)
+FILESYSTEM_DOMAIN   = $(CONDOR_HOST)
+TRUST_UID_DOMAIN = True
+DAEMON_LIST = %(DAEMON_LIST)s
+ALLOW_ADMINISTRATOR = $(CONDOR_HOST), node*
+ALLOW_OWNER = $(FULL_HOSTNAME), $(ALLOW_ADMINISTRATOR), $(CONDOR_HOST), node*
+ALLOW_READ = $(FULL_HOSTNAME), $(CONDOR_HOST), node*
+ALLOW_WRITE = $(FULL_HOSTNAME), $(CONDOR_HOST), node*
+SCHEDD_HOST = $(CONDOR_HOST)@$(CONDOR_HOST)
+SCHEDD_NAME = $(FULL_HOSTNAME)@$(FULL_HOSTNAME)
+START = True
+SUSPEND = False
+CONTINUE = True
+PREEMPT = False
+KILL = False
+WANT_SUSPEND = False
+WANT_VACATE = False
 """

@@ -18,6 +18,7 @@
 from tethyscluster import clustersetup
 from tethyscluster.templates import condor
 from tethyscluster.logger import log
+from tethyscluster.node import WindowsNode, UbuntuNode, Node
 
 CONDOR_CFG = '/etc/condor/config.d/40tethyscluster'
 FS_REMOTE_DIR = '/home/._condor_tmp'
@@ -25,14 +26,32 @@ FS_REMOTE_DIR = '/home/._condor_tmp'
 
 class CondorPlugin(clustersetup.DefaultClusterSetup):
 
+    def start_condor_cmd(self, node):
+        if isinstance(node, WindowsNode):
+            return 'cygrunsrv -S condor'
+        elif isinstance(node, UbuntuNode):
+            return '/etc/init.d/condor start'
+        else:
+            return 'condor_master'
+
+    def condor_tmpl(self, node):
+        if isinstance(node, WindowsNode):
+            return condor.condor_windows_tmpl
+        else:
+            return condor.condor_linux_tmpl
+
+
     def _add_condor_node(self, node):
+        condor_cfg_dir = node.ssh.execute('condor_config_val local_config_dir')[0]
+        node.ssh.mkdir(condor_cfg_dir, ignore_failure=True)
+        CONDOR_CFG = condor_cfg_dir + '/tethyscluster'
         condorcfg = node.ssh.remote_file(CONDOR_CFG, 'w')
         daemon_list = "MASTER, STARTD, SCHEDD"
         if node.is_master():
             daemon_list += ", COLLECTOR, NEGOTIATOR"
         ctx = dict(CONDOR_HOST='master', DAEMON_LIST=daemon_list,
                    FS_REMOTE_DIR=FS_REMOTE_DIR)
-        condorcfg.write(condor.condor_tmpl % ctx)
+        condorcfg.write(self.condor_tmpl(node) % ctx)
         condorcfg.close()
         node.ssh.execute('pkill condor', ignore_exit_status=True)
         config_vars = ["LOCAL_DIR", "LOG", "SPOOL", "RUN", "EXECUTE", "LOCK",
@@ -40,7 +59,7 @@ class CondorPlugin(clustersetup.DefaultClusterSetup):
         config_vals = ['$(condor_config_val %s)' % var for var in config_vars]
         node.ssh.execute('mkdir -p %s' % ' '.join(config_vals))
         node.ssh.execute('chown -R condor:condor %s' % ' '.join(config_vals))
-        node.ssh.execute('/etc/init.d/condor start')
+        node.ssh.execute(self.start_condor_cmd(node))
 
     def _setup_condor(self, master=None, nodes=None):
         log.info("Setting up Condor grid")

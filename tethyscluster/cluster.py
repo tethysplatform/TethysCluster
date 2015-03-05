@@ -36,7 +36,7 @@ from tethyscluster import threadpool
 from tethyscluster import validators
 from tethyscluster import progressbar
 from tethyscluster import clustersetup
-from tethyscluster.node import Node
+from tethyscluster.node import NodeFactory
 from tethyscluster.plugins import sge
 from tethyscluster.utils import print_timing
 from tethyscluster.templates import user_msgs
@@ -251,7 +251,7 @@ class ClusterManager(managers.Manager):
 
     def get_cluster_security_groups(self):
         """
-        Return all security groups on EC2 that start with '@sc-'
+        Return all security groups on EC2 that start with '@tc-'
         """
         glob = static.SECURITY_GROUP_TEMPLATE % '*'
         sgs = self.ec2.get_security_groups(filters={'group-name': glob})
@@ -263,7 +263,7 @@ class ClusterManager(managers.Manager):
         with static.SECURITY_GROUP_PREFIX
 
         Example:
-            sg = '@sc-mycluster'
+            sg = '@tc-mycluster'
             print get_tag_from_sg(sg)
             mycluster
         """
@@ -655,6 +655,7 @@ class Cluster(object):
             sg = self.ec2.create_group(self._security_group,
                                        description=desc,
                                        auth_ssh=True,
+                                       auth_rdp=True,
                                        auth_group_traffic=True,
                                        vpc_id=vpc_id)
             self._add_tags_to_sg(sg)
@@ -769,7 +770,7 @@ class Cluster(object):
                 enode.instance = node
             else:
                 log.debug('adding node %s to self._nodes list' % node.id)
-                n = Node(node, self.key_location)
+                n = NodeFactory.make_node(node, self.key_location)
                 if n.is_master():
                     self._master = n
                     self._nodes.insert(0, n)

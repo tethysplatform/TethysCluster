@@ -207,6 +207,7 @@ PROTOCOLS = ['tcp', 'udp', 'icmp']
 WORLD_CIDRIP = '0.0.0.0/0'
 
 DEFAULT_SSH_PORT = 22
+DEFAULT_RDP_PORT = 3389
 
 AVAILABLE_SHELLS = {
     "bash": True,

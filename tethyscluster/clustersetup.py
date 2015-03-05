@@ -379,7 +379,7 @@ class DefaultClusterSetup(ClusterSetup):
         self._setup_cluster_user()
         self._setup_scratch()
         self._setup_etc_hosts()
-        #self._setup_nfs()
+        self._setup_nfs()
         self._setup_passwordless_ssh()
 
     def _remove_from_etc_hosts(self, node):
@@ -423,7 +423,7 @@ class DefaultClusterSetup(ClusterSetup):
         self._volumes = volumes
         self._setup_hostnames(nodes=[node])
         self._setup_etc_hosts(nodes)
-        #self._setup_nfs(nodes=[node], start_server=False)
+        self._setup_nfs(nodes=[node], start_server=False)
         self._create_user(node)
         self._setup_scratch(nodes=[node])
         self._setup_passwordless_ssh(nodes=[node])

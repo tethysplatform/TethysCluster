@@ -28,7 +28,7 @@ class CondorPlugin(clustersetup.DefaultClusterSetup):
 
     def start_condor_cmd(self, node):
         if isinstance(node, WindowsNode):
-            return 'cygrunsrv -S condor'
+            return 'cygrunsrv -S condor; condor_restart'
         elif isinstance(node, UbuntuNode):
             return '/etc/init.d/condor start'
         else:

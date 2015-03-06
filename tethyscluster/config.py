@@ -20,11 +20,11 @@ import urllib
 import StringIO
 import ConfigParser
 
-from tethyscluster import utils
+from tethyscluster import utils, __all__
 from tethyscluster import static
 from tethyscluster import cluster
 from tethyscluster import awsutils
-from tethyscluster import deathrow
+from tethyscluster import clustersetup
 from tethyscluster import exception
 from tethyscluster.cluster import Cluster
 from tethyscluster.utils import AttributeDict
@@ -387,10 +387,68 @@ class TethysClusterConfig(object):
             del vol['__name__']
             vols[volume] = vol
 
-    def _load_plugins(self, store):
+    def _load_plugins(self):
+        for name in self.plugins:
+            plugin = self.plugins[name]
+            setup_class = plugin.get('setup_class')
+            plugin_name = plugin.get('__name__').split()[-1]
+            mod_name = '.'.join(setup_class.split('.')[:-1])
+            class_name = setup_class.split('.')[-1]
+            try:
+                mod = __import__(mod_name, globals(), locals(), [class_name])
+            except SyntaxError, e:
+                raise exception.PluginSyntaxError(
+                    "Plugin %s (%s) contains a syntax error at line %s" %
+                    (plugin_name, e.filename, e.lineno))
+            except ImportError, e:
+                raise exception.PluginLoadError(
+                    "Failed to import plugin %s: %s" %
+                    (plugin_name, e[0]))
+            klass = getattr(mod, class_name, None)
+            if not klass:
+                raise exception.PluginError(
+                    'Plugin class %s does not exist' % setup_class)
+            if not issubclass(klass, clustersetup.ClusterSetup):
+                raise exception.PluginError(
+                    "Plugin %s must be a subclass of "
+                    "tethyscluster.clustersetup.ClusterSetup" % setup_class)
+            args, kwargs = utils.get_arg_spec(klass.__init__, debug=DEBUG_CONFIG)
+            config_args = []
+            missing_args = []
+            for arg in args:
+                if arg in plugin:
+                    config_args.append(plugin.get(arg))
+                else:
+                    missing_args.append(arg)
+            if DEBUG_CONFIG:
+                log.debug("config_args = %s" % config_args)
+            if missing_args:
+                raise exception.PluginError(
+                    "Not enough settings provided for plugin %s (missing: %s)"
+                    % (plugin_name, ', '.join(missing_args)))
+            config_kwargs = {}
+            for arg in kwargs:
+                if arg in plugin:
+                    config_kwargs[arg] = plugin.get(arg)
+            if DEBUG_CONFIG:
+                log.debug("config_kwargs = %s" % config_kwargs)
+            try:
+                plug_obj = klass(*config_args, **config_kwargs)
+            except Exception as exc:
+                log.error("Error occured:", exc_info=True)
+                raise exception.PluginLoadError(
+                    "Failed to load plugin %s with "
+                    "the following error: %s - %s" %
+                    (setup_class, exc.__class__.__name__, exc.message))
+            if not hasattr(plug_obj, '__name__'):
+                setattr(plug_obj, '__name__', plugin_name)
+            self.plugins[name] = plug_obj
+
+
+    def _load_cluster_plugins(self, store):
         cluster_section = store
         plugins = cluster_section.get('plugins')
-        if not plugins or isinstance(plugins[0], AttributeDict):
+        if not plugins or isinstance(plugins[0], clustersetup.ClusterSetup):
             return
         plugs = []
         for plugin in plugins:
@@ -553,7 +611,7 @@ class TethysClusterConfig(object):
             self._load_defaults(self.cluster_settings, cluster_store[name])
             self._load_keypairs(cluster_store[name])
             self._load_volumes(cluster_store[name])
-            self._load_plugins(cluster_store[name])
+            self._load_cluster_plugins(cluster_store[name])
             self._load_permissions(cluster_store[name])
             self._load_instance_types(cluster_store[name])
             self._check_required(cl, self.cluster_settings,
@@ -579,6 +637,7 @@ class TethysClusterConfig(object):
         self.vols.update(self._load_sections('vol', self.volume_settings))
         self.plugins = self._load_sections('plugin', self.plugin_settings,
                                            filter_settings=False)
+        self._load_plugins()
         self.permissions = self._load_sections('permission',
                                                self.permission_settings)
         sections = self._get_sections('cluster')
@@ -615,9 +674,9 @@ class TethysClusterConfig(object):
             tag_name = tag_name or template_name
             kwargs.update(dict(cluster_tag=tag_name))
             kwargs.update(self.clusters[template_name])
-            plugs = kwargs.get('plugins')
-            kwargs['plugins'] = deathrow._load_plugins(plugs,
-                                                       debug=DEBUG_CONFIG)
+            print self.clusters[template_name]
+            # plugs = kwargs.get('plugins')
+            # kwargs['plugins'] = _load_plugins(plugs, debug=DEBUG_CONFIG)
             if not ec2_conn:
                 ec2_conn = self.get_easy_ec2()
 

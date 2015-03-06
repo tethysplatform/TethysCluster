@@ -30,7 +30,6 @@ from tethyscluster import static
 from tethyscluster import sshutils
 from tethyscluster import managers
 from tethyscluster import userdata
-from tethyscluster import deathrow
 from tethyscluster import exception
 from tethyscluster import threadpool
 from tethyscluster import validators
@@ -379,8 +378,9 @@ class ClusterManager(managers.Manager):
         cl = self.get_cluster(cluster_tag, load_plugins=False)
         if not cl.is_cluster_up():
             raise exception.ClusterNotRunning(cluster_tag)
-        plugs = [self.cfg.get_plugin(plugin_name)]
-        plug = deathrow._load_plugins(plugs)[0]
+        # plugs = [self.cfg.get_plugin(plugin_name)]
+        # plug = _load_plugins(plugs)[0]
+        plug = self.cfg.get_plugin(plugin_name)
         cl.run_plugin(plug, name=plugin_name)
 
 
@@ -500,7 +500,7 @@ class Cluster(object):
             warnings.warn("In a future release the plugins kwarg for Cluster "
                           "will require a list of plugin objects and not a "
                           "list of dicts", DeprecationWarning)
-            plugins = deathrow._load_plugins(plugins)
+            # plugins = _load_plugins(plugins)
         return plugins
 
     @property
@@ -2262,6 +2262,7 @@ class ClusterValidator(validators.Validator):
 
 if __name__ == "__main__":
     from tethyscluster.config import TethysClusterConfig
+
     cfg = TethysClusterConfig().load()
     sc = cfg.get_cluster_template('smallcluster', 'mynewcluster')
     if sc.is_valid():

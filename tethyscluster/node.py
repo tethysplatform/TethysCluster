@@ -39,6 +39,11 @@ class NodeManager(managers.Manager):
     """
     Manager class for Node objects
     """
+    platform_node_dict = {
+    'windows':WindowsNode,
+    'ubuntu':UbuntuNode,
+    }
+
     def ssh_to_node(self, node_id, user='root', command=None,
                     forward_x11=False, forward_agent=False):
         node = self.get_node(node_id, user=user)
@@ -59,10 +64,15 @@ class NodeManager(managers.Manager):
         if not node:
             raise exception.InstanceDoesNotExist(node_id)
         key = self.cfg.get_key(node.key_name)
-        node = Node(node, key.key_location, user=user)
+        node = self.make_node(node, key.key_location, user=user) #TODO
         return node
 
-
+    @classmethod
+    def make_node(cls, instance, key_location, alias=None, user='root'):
+        platform = instance.platform
+        log.debug(platform)
+        PlatformSpecificNode = cls.platform_node_dict[platform]
+        return PlatformSpecificNode(instance, key_location, alias, user)
 
 
 class Node(object):
@@ -2562,16 +2572,3 @@ class WindowsNode(Node):
         auth_keys.chmod(0600)
         auth_keys.close()
         return key
-
-
-class NodeFactory(object):
-    platform_node_dict = {
-    'windows':WindowsNode,
-    'ubuntu':UbuntuNode,
-    }
-    @classmethod
-    def make_node(cls, instance, key_location, alias=None, user='root'):
-        platform = instance.platform
-        log.debug(platform)
-        PlatformSpecificNode = cls.platform_node_dict[platform]
-        return PlatformSpecificNode(instance, key_location, alias, user)

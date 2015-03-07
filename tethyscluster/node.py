@@ -33,48 +33,6 @@ from tethyscluster import exception
 from tethyscluster.logger import log
 
 
-import sys
-
-class NodeManager(managers.Manager):
-    """
-    Manager class for Node objects
-    """
-    platform_node_dict = {
-    'windows':WindowsNode,
-    'ubuntu':UbuntuNode,
-    }
-
-    def ssh_to_node(self, node_id, user='root', command=None,
-                    forward_x11=False, forward_agent=False):
-        node = self.get_node(node_id, user=user)
-        return node.shell(user=user, command=command, forward_x11=forward_x11,
-                          forward_agent=forward_agent)
-
-    def get_node(self, node_id, user='root'):
-        """Factory for Node class"""
-        instances = self.ec2.get_all_instances()
-        node = None
-        for instance in instances:
-            if instance.dns_name == node_id:
-                node = instance
-                break
-            elif instance.id == node_id:
-                node = instance
-                break
-        if not node:
-            raise exception.InstanceDoesNotExist(node_id)
-        key = self.cfg.get_key(node.key_name)
-        node = self.make_node(node, key.key_location, user=user) #TODO
-        return node
-
-    @classmethod
-    def make_node(cls, instance, key_location, alias=None, user='root'):
-        platform = instance.platform
-        log.debug(platform)
-        PlatformSpecificNode = cls.platform_node_dict[platform]
-        return PlatformSpecificNode(instance, key_location, alias, user)
-
-
 class Node(object):
     """
     This class represents a single compute node in a TethysCluster.
@@ -2572,3 +2530,43 @@ class WindowsNode(Node):
         auth_keys.chmod(0600)
         auth_keys.close()
         return key
+
+
+class NodeManager(managers.Manager):
+    """
+    Manager class for Node objects
+    """
+    PLATFORM_NODE_DICT = {
+    'windows': WindowsNode,
+    'ubuntu': UbuntuNode,
+    }
+
+    @classmethod
+    def make_node(cls, instance, key_location, alias=None, user='root'):
+        platform = instance.platform
+        log.debug(platform)
+        PlatformSpecificNode = cls.PLATFORM_NODE_DICT[platform]
+        return PlatformSpecificNode(instance, key_location, alias, user)
+
+    def ssh_to_node(self, node_id, user='root', command=None,
+                    forward_x11=False, forward_agent=False):
+        node = self.get_node(node_id, user=user)
+        return node.shell(user=user, command=command, forward_x11=forward_x11,
+                          forward_agent=forward_agent)
+
+    def get_node(self, node_id, user='root'):
+        """Factory for Node class"""
+        instances = self.ec2.get_all_instances()
+        node = None
+        for instance in instances:
+            if instance.dns_name == node_id:
+                node = instance
+                break
+            elif instance.id == node_id:
+                node = instance
+                break
+        if not node:
+            raise exception.InstanceDoesNotExist(node_id)
+        key = self.cfg.get_key(node.key_name)
+        node = self.make_node(node, key.key_location, user=user)
+        return node

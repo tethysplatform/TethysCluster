@@ -378,8 +378,6 @@ class ClusterManager(managers.Manager):
         cl = self.get_cluster(cluster_tag, load_plugins=False)
         if not cl.is_cluster_up():
             raise exception.ClusterNotRunning(cluster_tag)
-        # plugs = [self.cfg.get_plugin(plugin_name)]
-        # plug = _load_plugins(plugs)[0]
         plug = self.cfg.get_plugin(plugin_name)
         cl.run_plugin(plug, name=plugin_name)
 

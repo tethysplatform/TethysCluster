@@ -674,9 +674,6 @@ class TethysClusterConfig(object):
             tag_name = tag_name or template_name
             kwargs.update(dict(cluster_tag=tag_name))
             kwargs.update(self.clusters[template_name])
-            print self.clusters[template_name]
-            # plugs = kwargs.get('plugins')
-            # kwargs['plugins'] = _load_plugins(plugs, debug=DEBUG_CONFIG)
             if not ec2_conn:
                 ec2_conn = self.get_easy_ec2()
 

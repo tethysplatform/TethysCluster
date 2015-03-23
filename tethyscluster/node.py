@@ -2539,12 +2539,13 @@ class NodeManager(managers.Manager):
     PLATFORM_NODE_DICT = {
     'windows': WindowsNode,
     'ubuntu': UbuntuNode,
+    None: Node,
     }
 
     @classmethod
     def make_node(cls, instance, key_location, alias=None, user='root'):
         platform = instance.platform
-        log.debug(platform)
+        log.debug('Making node for platform %s' % (platform,))
         PlatformSpecificNode = cls.PLATFORM_NODE_DICT[platform]
         return PlatformSpecificNode(instance, key_location, alias, user)
 

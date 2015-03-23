@@ -30,7 +30,7 @@ import posixpath
 
 import scp
 import paramiko
-paramiko.util.log_to_file('logs/paramiko.log')
+# paramiko.util.log_to_file('~/.tethyscluster/logs/paramiko.log')
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
 
@@ -269,7 +269,7 @@ class SSHClient(object):
         try:
             return self.sftp.mkdir(path, mode)
         except IOError as e:
-            print str(e)
+            log.error(str(e))
             if not ignore_failure:
                 raise
 

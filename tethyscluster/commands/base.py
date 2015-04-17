@@ -44,7 +44,7 @@ class CmdBase(completion.CmdComplete):
     gparser = None
     subcmds_map = None
     _cfg = None
-    _ec2 = None
+    _cloud = None
     _s3 = None
     _cm = None
     _nm = None
@@ -96,25 +96,25 @@ class CmdBase(completion.CmdComplete):
         return self._cfg
 
     @property
-    def ec2(self):
+    def cloud(self):
         """
-        Get EasyEC2 object from config and connect to the region specified
+        Get EasyCloud object from config and connect to the region specified
         by the user in the global options (if any)
         """
-        if not self._ec2:
-            ec2 = self.cfg.get_easy_ec2()
+        if not self._cloud:
+            cloud = self.cfg.get_easy_cloud()
             if self.gopts.REGION:
-                ec2.connect_to_region(self.gopts.REGION)
-            self._ec2 = ec2
-        return self._ec2
+                cloud.connect_to_region(self.gopts.REGION)
+            self._cloud = cloud
+        return self._cloud
 
     @property
     def cluster_manager(self):
         """
-        Returns ClusterManager object configured with self.cfg and self.ec2
+        Returns ClusterManager object configured with self.cfg and self.cloud
         """
         if not self._cm:
-            cm = cluster.ClusterManager(self.cfg, ec2=self.ec2)
+            cm = cluster.ClusterManager(self.cfg, cloud=self.cloud)
             self._cm = cm
         return self._cm
 
@@ -123,10 +123,10 @@ class CmdBase(completion.CmdComplete):
     @property
     def node_manager(self):
         """
-        Returns NodeManager object configured with self.cfg and self.ec2
+        Returns NodeManager object configured with self.cfg and self.cloud
         """
         if not self._nm:
-            nm = node.NodeManager(self.cfg, ec2=self.ec2)
+            nm = node.NodeManager(self.cfg, cloud=self.cloud)
             self._nm = nm
         return self._nm
 

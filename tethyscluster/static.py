@@ -77,6 +77,8 @@ TETHYSCLUSTER_RECEIPT_DIR = "/var/run/tethyscluster"
 TETHYSCLUSTER_RECEIPT_FILE = os.path.join(TETHYSCLUSTER_RECEIPT_DIR, "receipt.pkl")
 STARCLUSTER_OWNER_ID = 342652561657
 
+CLOUD_PROVIDERS = {'aws':'AWS', 'azure':'Azure'}
+
 DEBUG_FILE = os.path.join(TETHYSCLUSTER_LOG_DIR, 'debug.log')
 SSH_DEBUG_FILE = os.path.join(TETHYSCLUSTER_LOG_DIR, 'ssh-debug.log')
 AWS_DEBUG_FILE = os.path.join(TETHYSCLUSTER_LOG_DIR, 'aws-debug.log')
@@ -110,7 +112,7 @@ VOLUME_STATUS = ['creating', 'available', 'in-use',
                  'deleting', 'deleted', 'error']
 VOLUME_ATTACH_STATUS = ['attaching', 'attached', 'detaching', 'detached']
 
-INSTANCE_TYPES = {
+AWS_INSTANCE_TYPES = {
     't1.micro': ['i386', 'x86_64'],
     't2.micro': ['i386', 'x86_64'],
     't2.small': ['i386', 'x86_64'],
@@ -150,6 +152,40 @@ INSTANCE_TYPES = {
     'i2.4xlarge': ['x86_64'],
     'i2.8xlarge': ['x86_64'],
 }
+
+AZURE_INSTANCE_TYPES = {
+    'ExtraSmall': ['x86_64'],
+    'Small': ['x86_64'],
+    'Medium': ['x86_64'],
+    'Large': ['x86_64'],
+    'ExtraLarge': ['x86_64'],
+    'A5': ['x86_64'],
+    'A6': ['x86_64'],
+    'A7': ['x86_64'],
+    'A8': ['x86_64'],
+    'A9': ['x86_64'],
+    'Basic_A0': ['x86_64'],
+    'Basic_A1': ['x86_64'],
+    'Basic_A2': ['x86_64'],
+    'Basic_A3': ['x86_64'],
+    'Basic_A4': ['x86_64'],
+    'Standard_D1': ['x86_64'],
+    'Standard_D2': ['x86_64'],
+    'Standard_D3': ['x86_64'],
+    'Standard_D4': ['x86_64'],
+    'Standard_D11': ['x86_64'],
+    'Standard_D12': ['x86_64'],
+    'Standard_D13': ['x86_64'],
+    'Standard_D14': ['x86_64'],
+    'Standard_G1': ['x86_64'],
+    'Standard_G2': ['x86_64'],
+    'Sandard_G3': ['x86_64'],
+    'Standard_G4': ['x86_64'],
+    'Standard_G5': ['x86_64'],
+}
+
+INSTANCE_TYPES = dict(AZURE_INSTANCE_TYPES)
+INSTANCE_TYPES.update(AWS_INSTANCE_TYPES)
 
 T1_INSTANCE_TYPES = ['t1.micro']
 
@@ -246,6 +282,25 @@ AWS_SETTINGS = {
     'aws_validate_certs': (bool, False, True, None, None),
 }
 
+AZURE_SETTINGS = {
+    'subscription_id': (str, True, None, None, None),
+    'certificate_path': (str, True, None, None, __expand_all),
+    # 'azure_cert': (str, False, None, None, __expand_all),
+    # 'azure_private_key': (str, False, None, None, __expand_all),
+    # 'aws_port': (int, False, None, None, None),
+    # 'aws_ec2_path': (str, False, '/', None, None),
+    # 'aws_s3_path': (str, False, '/', None, None),
+    # 'aws_is_secure': (bool, False, True, None, None),
+    # 'aws_region_name': (str, False, None, None, None),
+    # 'aws_region_host': (str, False, None, None, None),
+    # 'aws_s3_host': (str, False, None, None, None),
+    # 'aws_proxy': (str, False, None, None, None),
+    # 'aws_proxy_port': (int, False, None, None, None),
+    # 'aws_proxy_user': (str, False, None, None, None),
+    # 'aws_proxy_pass': (str, False, None, None, None),
+    # 'aws_validate_certs': (bool, False, True, None, None),
+}
+
 KEY_SETTINGS = {
     'key_location': (str, True, None, None, __expand_all),
 }
@@ -276,9 +331,10 @@ PERMISSION_SETTINGS = {
 }
 
 CLUSTER_SETTINGS = {
+    'cloud_provider': (str, True, CLOUD_PROVIDERS['aws'], None, None),
     'spot_bid': (float, False, None, None, None),
     'cluster_size': (int, True, None, None, None),
-    'cluster_user': (str, False, 'sgeadmin', None, None),
+    'cluster_user': (str, False, 'tethysadmin', None, None),
     'cluster_shell': (str, False, 'bash', AVAILABLE_SHELLS.keys(), None),
     'subnet_id': (str, False, None, None, None),
     'public_ips': (bool, False, None, None, None),

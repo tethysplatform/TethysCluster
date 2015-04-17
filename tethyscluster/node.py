@@ -27,6 +27,7 @@ from tethyscluster import utils
 from tethyscluster import static
 from tethyscluster import sshutils
 from tethyscluster import awsutils
+from tethyscluster import azureutils
 from tethyscluster import managers
 from tethyscluster import userdata
 from tethyscluster import exception
@@ -42,6 +43,7 @@ class Node(object):
     creating/modifying files on the node.
 
     'instance' arg must be an instance of boto.ec2.instance.Instance
+    or a instance for azureutils
 
     'key_location' arg is a string that contains the full path to the
     private key corresponding to the keypair used to launch this node
@@ -54,9 +56,12 @@ class Node(object):
     """
     def __init__(self, instance, key_location, alias=None, user='root'):
         self.instance = instance
-        self.ec2 = awsutils.EasyEC2(instance.connection.aws_access_key_id,
-                                    instance.connection.aws_secret_access_key,
-                                    connection=instance.connection)
+        if isinstance(instance, azureutils.Instance):
+            self.cloud = instance.connection
+        else:
+            self.cloud = awsutils.EasyEC2(instance.connection.aws_access_key_id,
+                                        instance.connection.aws_secret_access_key,
+                                        connection=instance.connection)
         self.key_location = key_location
         self.user = user
         self._alias = alias
@@ -74,7 +79,7 @@ class Node(object):
         last_try = tries[-1]
         for i in tries:
             try:
-                user_data = self.ec2.get_instance_user_data(self.id)
+                user_data = self.cloud.get_instance_user_data(self.id)
                 return user_data
             except exception.InstanceDoesNotExist:
                 if i == last_try:
@@ -120,7 +125,7 @@ class Node(object):
                               aliasestxt)
                 if not alias:
                     raise exception.BaseException(
-                        "instance %s has no alias" % self.id)
+                        "instance %s has no alias" % (self.id,))
                 self.add_tag('alias', alias)
             if not self.tags.get('Name'):
                 self.add_tag('Name', alias)
@@ -178,7 +183,7 @@ class Node(object):
     def groups(self):
         if not self._groups:
             groups = map(lambda x: x.name, self.instance.groups)
-            self._groups = self.ec2.get_all_security_groups(groupnames=groups)
+            self._groups = self.cloud.get_all_security_groups(groupnames=groups)
         return self._groups
 
     @property
@@ -844,12 +849,15 @@ class Node(object):
         the case of EBS backed instances
         """
         attached_vols = {}
-        attached_vols.update(self.block_device_mapping)
-        if self.is_ebs_backed():
-            # exclude the root device from the list
-            root_dev = self.root_device_name
-            if root_dev in attached_vols:
-                attached_vols.pop(root_dev)
+        try:
+            attached_vols.update(self.block_device_mapping)
+            if self.is_ebs_backed():
+                # exclude the root device from the list
+                root_dev = self.root_device_name
+                if root_dev in attached_vols:
+                    attached_vols.pop(root_dev)
+        except:
+            pass #TODO remove try except
         return attached_vols
 
     def detach_external_volumes(self):
@@ -859,7 +867,7 @@ class Node(object):
         block_devs = self.attached_vols
         for dev in block_devs:
             vol_id = block_devs[dev].volume_id
-            vol = self.ec2.get_volume(vol_id)
+            vol = self.cloud.get_volume(vol_id)
             log.info("Detaching volume %s from %s" % (vol.id, self.alias))
             if vol.status not in ['available', 'detaching']:
                 vol.detach()
@@ -872,7 +880,7 @@ class Node(object):
             return
         root_vol = self.block_device_mapping[self.root_device_name]
         vol_id = root_vol.volume_id
-        vol = self.ec2.get_volume(vol_id)
+        vol = self.cloud.get_volume(vol_id)
         vol.detach()
         while vol.update() != 'available':
             time.sleep(5)
@@ -885,7 +893,7 @@ class Node(object):
             return self.instance.spot_instance_request_id
 
     def get_spot_request(self):
-        spot = self.ec2.get_all_spot_requests(
+        spot = self.cloud.get_all_spot_requests(
             filters={'spot-instance-request-id': self.spot_id})
         if spot:
             return spot[0]
@@ -998,9 +1006,9 @@ class Node(object):
         if not self.is_ssh_up():
             return False
         if self.private_ip_address is None:
-            log.debug("instance %s has no private_ip_address" % self.id)
+            log.debug("instance %s has no private_ip_address" % (self.id,))
             log.debug("attempting to determine private_ip_address for "
-                      "instance %s" % self.id)
+                      "instance %s" % (self.id,))
             try:
                 private_ip = self.ssh.execute(
                     'python -c '
@@ -1015,7 +1023,7 @@ class Node(object):
         return True
 
     def update(self):
-        res = self.ec2.get_all_instances(filters={'instance-id': self.id})
+        res = self.cloud.get_all_instances(filters={'instance-id': self.id})
         self.instance = res[0]
         return self.state
 
@@ -1038,8 +1046,14 @@ class Node(object):
     @property
     def ssh(self):
         if not self._ssh:
+            port = 22
+            if hasattr(self.instance, 'ports'):
+                if 'ssh' in self.instance.ports.keys():
+                    port = self.instance.ports['ssh']
+
             self._ssh = sshutils.SSHClient(self.addr,
                                            username=self.user,
+                                           port = port,
                                            private_key=self.key_location)
         return self._ssh
 
@@ -1178,6 +1192,7 @@ class UbuntuNode(Node):
     creating/modifying files on the node.
 
     'instance' arg must be an instance of boto.ec2.instance.Instance
+    or an instance from azureutils
 
     'key_location' arg is a string that contains the full path to the
     private key corresponding to the keypair used to launch this node
@@ -1190,7 +1205,7 @@ class UbuntuNode(Node):
     """
     def __init__(self, instance, key_location, alias=None, user='root'):
         self.instance = instance
-        self.ec2 = awsutils.EasyEC2(instance.connection.aws_access_key_id,
+        self.cloud = awsutils.EasyEC2(instance.connection.aws_access_key_id,
                                     instance.connection.aws_secret_access_key,
                                     connection=instance.connection)
         self.key_location = key_location
@@ -1210,7 +1225,7 @@ class UbuntuNode(Node):
         last_try = tries[-1]
         for i in tries:
             try:
-                user_data = self.ec2.get_instance_user_data(self.id)
+                user_data = self.cloud.get_instance_user_data(self.id)
                 return user_data
             except exception.InstanceDoesNotExist:
                 if i == last_try:
@@ -1256,7 +1271,7 @@ class UbuntuNode(Node):
                               aliasestxt)
                 if not alias:
                     raise exception.BaseException(
-                        "instance %s has no alias" % self.id)
+                        "instance %s has no alias" % (self.id,))
                 self.add_tag('alias', alias)
             if not self.tags.get('Name'):
                 self.add_tag('Name', alias)
@@ -1314,7 +1329,7 @@ class UbuntuNode(Node):
     def groups(self):
         if not self._groups:
             groups = map(lambda x: x.name, self.instance.groups)
-            self._groups = self.ec2.get_all_security_groups(groupnames=groups)
+            self._groups = self.cloud.get_all_security_groups(groupnames=groups)
         return self._groups
 
     @property
@@ -1994,7 +2009,7 @@ class UbuntuNode(Node):
         block_devs = self.attached_vols
         for dev in block_devs:
             vol_id = block_devs[dev].volume_id
-            vol = self.ec2.get_volume(vol_id)
+            vol = self.cloud.get_volume(vol_id)
             log.info("Detaching volume %s from %s" % (vol.id, self.alias))
             if vol.status not in ['available', 'detaching']:
                 vol.detach()
@@ -2007,7 +2022,7 @@ class UbuntuNode(Node):
             return
         root_vol = self.block_device_mapping[self.root_device_name]
         vol_id = root_vol.volume_id
-        vol = self.ec2.get_volume(vol_id)
+        vol = self.cloud.get_volume(vol_id)
         vol.detach()
         while vol.update() != 'available':
             time.sleep(5)
@@ -2020,7 +2035,7 @@ class UbuntuNode(Node):
             return self.instance.spot_instance_request_id
 
     def get_spot_request(self):
-        spot = self.ec2.get_all_spot_requests(
+        spot = self.cloud.get_all_spot_requests(
             filters={'spot-instance-request-id': self.spot_id})
         if spot:
             return spot[0]
@@ -2133,9 +2148,9 @@ class UbuntuNode(Node):
         if not self.is_ssh_up():
             return False
         if self.private_ip_address is None:
-            log.debug("instance %s has no private_ip_address" % self.id)
+            log.debug("instance %s has no private_ip_address" % (self.id,))
             log.debug("attempting to determine private_ip_address for "
-                      "instance %s" % self.id)
+                      "instance %s" % (self.id,))
             try:
                 private_ip = self.ssh.execute(
                     'python -c '
@@ -2150,7 +2165,7 @@ class UbuntuNode(Node):
         return True
 
     def update(self):
-        res = self.ec2.get_all_instances(filters={'instance-id': self.id})
+        res = self.cloud.get_all_instances(filters={'instance-id': self.id})
         self.instance = res[0]
         return self.state
 
@@ -2539,6 +2554,7 @@ class NodeManager(managers.Manager):
     PLATFORM_NODE_DICT = {
     'windows': WindowsNode,
     'ubuntu': UbuntuNode,
+    'linux': Node,
     None: Node,
     }
 
@@ -2557,7 +2573,7 @@ class NodeManager(managers.Manager):
 
     def get_node(self, node_id, user='root'):
         """Factory for Node class"""
-        instances = self.ec2.get_all_instances()
+        instances = self.cloud.get_all_instances()
         node = None
         for instance in instances:
             if instance.dns_name == node_id:

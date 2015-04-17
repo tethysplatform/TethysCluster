@@ -41,13 +41,16 @@ from tethyscluster.utils import print_timing
 from tethyscluster.templates import user_msgs
 from tethyscluster.logger import log
 
+from tethyscluster import azureutils
+from tethyscluster.azurecluster import AzureCluster
+
 
 class ClusterManager(managers.Manager):
     """
     Manager class for Cluster objects
     """
     def __repr__(self):
-        return "<ClusterManager: %s>" % self.ec2.region.name
+        return "<ClusterManager: %s>" % self.cloud.region.name
 
     def get_cluster(self, cluster_name, group=None, load_receipt=True,
                     load_plugins=True, load_volumes=True, require_keys=True):
@@ -58,9 +61,13 @@ class ClusterManager(managers.Manager):
             clname = self._get_cluster_name(cluster_name)
             cltag = self.get_tag_from_sg(clname)
             if not group:
-                group = self.ec2.get_security_group(clname)
-            cl = Cluster(ec2_conn=self.ec2, cluster_tag=cltag,
-                         cluster_group=group)
+                group = self.cloud.get_security_group(clname)
+            if isinstance(self.cloud, azureutils.EasyAzure):
+                cl = AzureCluster(cloud_conn=self.cloud, cluster_tag=cltag,
+                             cluster_group=group)
+            else:
+                cl = Cluster(ec2_conn=self.cloud, cluster_tag=cltag,
+                             cluster_group=group)
             if load_receipt:
                 cl.load_receipt(load_plugins=load_plugins,
                                 load_volumes=load_volumes)
@@ -104,7 +111,7 @@ class ClusterManager(managers.Manager):
         be set to tag_name
         """
         cl = self.cfg.get_cluster_template(template_name, tag_name=tag_name,
-                                           ec2_conn=self.ec2, **kwargs)
+                                           cloud_conn=self.cloud, **kwargs)
         return cl
 
     def get_default_template_cluster(self, tag_name=None, **kwargs):
@@ -164,7 +171,7 @@ class ClusterManager(managers.Manager):
 
     def _get_cluster_name(self, cluster_name):
         """
-        Returns human readable cluster name/tag prefixed with '@sc-'
+        Returns human readable cluster name/tag prefixed with '@tc-'
         """
         if not cluster_name.startswith(static.SECURITY_GROUP_PREFIX):
             cluster_name = static.SECURITY_GROUP_TEMPLATE % cluster_name
@@ -236,11 +243,11 @@ class ClusterManager(managers.Manager):
 
     def get_cluster_security_group(self, group_name):
         """
-        Return cluster security group by appending '@sc-' to group_name and
+        Return cluster security group by appending '@tc-' to group_name and
         querying EC2.
         """
         gname = self._get_cluster_name(group_name)
-        return self.ec2.get_security_group(gname)
+        return self.cloud.get_security_group(gname)
 
     def get_cluster_group_or_none(self, group_name):
         try:
@@ -253,7 +260,7 @@ class ClusterManager(managers.Manager):
         Return all security groups on EC2 that start with '@tc-'
         """
         glob = static.SECURITY_GROUP_TEMPLATE % '*'
-        sgs = self.ec2.get_security_groups(filters={'group-name': glob})
+        sgs = self.cloud.get_security_groups(filters={'group-name': glob})
         return sgs
 
     def get_tag_from_sg(self, sg):
@@ -611,7 +618,7 @@ class Cluster(object):
             raise
         except exception.MasterDoesNotExist:
             raise
-        except Exception:
+        except Exception, e:
             log.debug('load receipt exception: ', exc_info=True)
             raise exception.IncompatibleCluster(self.cluster_group)
         return True
@@ -762,12 +769,12 @@ class Cluster(object):
         log.debug('existing nodes: %s' % existing_nodes)
         for node in nodes:
             if node.id in existing_nodes:
-                log.debug('updating existing node %s in self._nodes' % node.id)
+                log.debug('updating existing node %s in self._nodes' % (node.id,))
                 enode = existing_nodes.get(node.id)
                 enode.key_location = self.key_location
                 enode.instance = node
             else:
-                log.debug('adding node %s to self._nodes list' % node.id)
+                log.debug('adding node %s to self._nodes list' % (node.id,))
                 n = NodeManager.make_node(node, self.key_location)
                 if n.is_master():
                     self._master = n
@@ -1489,7 +1496,7 @@ class Cluster(object):
                 continue
             if vol.status != "available":
                 log.error('Volume %s not available...'
-                          'please check and try again' % vol.id)
+                          'please check and try again' % (vol.id,))
                 continue
             log.info("Attaching volume %s to master node on %s ..." %
                      (vol.id, device))
@@ -1579,7 +1586,7 @@ class Cluster(object):
             node.terminate()
         for spot in self.spot_requests:
             if spot.state not in ['cancelled', 'closed']:
-                log.info("Canceling spot instance request: %s" % spot.id)
+                log.info("Canceling spot instance request: %s" % (spot.id,))
                 spot.cancel()
         s = utils.get_spinner("Waiting for cluster to terminate...")
         try:

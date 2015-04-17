@@ -71,7 +71,7 @@ class CmdTerminate(ClusterCompleter):
                 return
         insts = cl.cluster_group.instances()
         for inst in insts:
-            log.info("Terminating %s" % inst.id)
+            log.info("Terminating %s" % (inst.id,))
             inst.terminate()
         cl.terminate_cluster(force=True)
 

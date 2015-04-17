@@ -24,14 +24,28 @@ from tethyscluster import utils, __all__
 from tethyscluster import static
 from tethyscluster import cluster
 from tethyscluster import awsutils
+from tethyscluster import azureutils
 from tethyscluster import clustersetup
 from tethyscluster import exception
 from tethyscluster.cluster import Cluster
+from tethyscluster.azurecluster import AzureCluster
 from tethyscluster.utils import AttributeDict
 
-from tethyscluster.logger import log
+from tethyscluster.logger import log, configure_sc_logging
 
-DEBUG_CONFIG = False
+DEBUG_CONFIG = True
+configure_sc_logging()
+
+
+def get_easy_cloud(config_file=None, cache=False):
+    """
+    Factory for EasyCloud class that attempts to load cloud credentials from
+    the TethysCluster config file. Returns an EasyCloud object if
+    successful.
+    """
+    cfg = get_config(config_file, cache)
+    return cfg.get_easy_cloud()
+    #TODO need to be able to pass type of cloud
 
 
 def get_easy_s3(config_file=None, cache=False):
@@ -87,6 +101,7 @@ class TethysClusterConfig(object):
 
     global_settings = static.GLOBAL_SETTINGS
     aws_settings = static.AWS_SETTINGS
+    azure_settings = static.AZURE_SETTINGS
     key_settings = static.KEY_SETTINGS
     volume_settings = static.EBS_VOLUME_SETTINGS
     plugin_settings = static.PLUGIN_SETTINGS
@@ -112,6 +127,7 @@ class TethysClusterConfig(object):
         self._config = None
         self.globals = AttributeDict()
         self.aws = AttributeDict()
+        self.azure = AttributeDict()
         self.clusters = AttributeDict()
         self.keys = AttributeDict()
         self.vols = AttributeDict()
@@ -627,11 +643,18 @@ class TethysClusterConfig(object):
             self.globals = self._load_section('global', self.global_settings)
         except exception.ConfigSectionMissing:
             pass
+
         try:
             self.aws = self._load_section('aws info', self.aws_settings)
         except exception.ConfigSectionMissing:
             log.warn("No [aws info] section found in the config!")
+        try:
+            self.azure = self._load_section('azure info', self.azure_settings)
+        except exception.ConfigSectionMissing:
+            log.warn("No [azure info] section found in the config!")
+
         self.aws.update(self.get_settings_from_env(self.aws_settings))
+        self.azure.update(self.get_settings_from_env(self.azure_settings))
         self.keys = self._load_sections('key', self.key_settings)
         self.vols = self._load_sections('volume', self.volume_settings)
         self.vols.update(self._load_sections('vol', self.volume_settings))
@@ -660,7 +683,7 @@ class TethysClusterConfig(object):
         return found
 
     def get_cluster_template(self, template_name, tag_name=None,
-                             ec2_conn=None, **kwargs):
+                             cloud_conn=None, **kwargs):
         """
         Returns Cluster instance configured with the settings in the
         config file.
@@ -674,10 +697,15 @@ class TethysClusterConfig(object):
             tag_name = tag_name or template_name
             kwargs.update(dict(cluster_tag=tag_name))
             kwargs.update(self.clusters[template_name])
-            if not ec2_conn:
-                ec2_conn = self.get_easy_ec2()
-
-            clust = Cluster(ec2_conn, **kwargs)
+            cloud_provider = self.clusters[template_name]['cloud_provider']
+            if not cloud_conn:
+                cloud_conn = self.get_easy_cloud(cloud_provider)
+            if cloud_provider == static.CLOUD_PROVIDERS['azure']:
+                clust = AzureCluster(cloud_conn, **kwargs)
+            elif cloud_provider == static.CLOUD_PROVIDERS['aws']:
+                clust = Cluster(cloud_conn, **kwargs)
+            else:
+                raise Exception('%s is not a supported cloud provider.' % (cloud_provider,)) #TODO make exception
             return clust
         except KeyError:
             raise exception.ClusterTemplateDoesNotExist(template_name)
@@ -738,9 +766,29 @@ class TethysClusterConfig(object):
         except TypeError:
             raise exception.ConfigError("no aws credentials found")
 
+    def get_easy_sms(self):
+        """
+        Factory for EasySMS class that attempts to load Azure credentials from
+        the TethysCluster config file. Returns an EasySMS object if
+        successful.
+        """
+        try:
+            sms = azureutils.EasySMS(**self.azure)
+            return sms
+        except TypeError:
+            raise exception.ConfigError("no azure credentials found")
+
+    def get_easy_cloud(self, provider=static.CLOUD_PROVIDERS['azure']):
+        if provider == static.CLOUD_PROVIDERS['aws']:
+            return self.get_easy_ec2()
+        elif provider == static.CLOUD_PROVIDERS['azure']:
+            return self.get_easy_sms()
+        else:
+            raise Exception('cloud provider %s not supported' % (provider,))
+
     def get_cluster_manager(self):
-        ec2 = self.get_easy_ec2()
-        return cluster.ClusterManager(self, ec2)
+        cloud = self.get_easy_cloud()
+        return cluster.ClusterManager(self, cloud)
 
 
 class InlineCommentsIgnoredConfigParser(ConfigParser.ConfigParser):
@@ -799,6 +847,8 @@ if __name__ == "__main__":
     from pprint import pprint
     cfg = TethysClusterConfig().load()
     pprint(cfg.aws)
+    pprint(cfg.azure)
     pprint(cfg.clusters)
     pprint(cfg.keys)
     pprint(cfg.vols)
+    cfg.get_easy_cloud()

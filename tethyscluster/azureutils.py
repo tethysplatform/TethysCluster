@@ -25,6 +25,7 @@ import time
 import base64
 import string
 import tempfile
+import fnmatch
 
 from azure import *
 from azure.servicemanagement import *
@@ -61,6 +62,7 @@ class EasyAzure(object):
         self.certificate_path = certificate_path
         self.connection_authenticator = connection_authenticator
         self._conn = None
+        self._subscription_name = None
         self._kwargs = kwargs
 
     def reload(self):
@@ -94,6 +96,12 @@ class EasyAzure(object):
             # self._conn.https_validate_certificates = validate_certs
         return self._conn
 
+    @property
+    def subscription_name(self):
+        if not self._subscription_name:
+            subscription_name = self.conn.get_subscription().subscription_name
+            self._subscription_name = subscription_name
+        return self._subscription_name
 
 class EasySMS(EasyAzure):
     def __init__(self, subscription_id, certificate_path,
@@ -213,34 +221,133 @@ class EasySMS(EasyAzure):
         raise NotImplementedError()
 
     def delete_group(self, group, max_retries=60, retry_delay=5):
-        raise NotImplementedError()
+        """
+        This method deletes a security or placement group using group.delete()
+        but in the case that group.delete() throws a DependencyViolation error
+        or InvalidPlacementGroup.InUse error it will keep retrying until it's
+        successful. Waits 5 seconds between each retry.
+        """
+        label = 'placement'
+        if isinstance(group, SecurityGroup):
+            label = 'security'
+        else:
+            group = SecurityGroup(group, self) #TODO create PlacementGroup class
+        s = utils.get_spinner("Removing %s group: %s" % (label, group.name))
+        try:
+            for i in range(max_retries):
+                try:
+                    self.conn.delete_hosted_service(group.id)
+                    return
+                except azure.WindowsAzureError as e:
+                    if i == max_retries - 1:
+                        raise
+                    # if e.error_code == 'DependencyViolation':
+                    #     log.debug('DependencyViolation error - retrying in 5s',
+                    #               exc_info=True)
+                    #     time.sleep(retry_delay)
+                    # elif e.error_code == 'InvalidPlacementGroup.InUse':
+                    #     log.debug('Placement group in use - retrying in 5s',
+                    #               exc_info=True)
+                    #     time.sleep(retry_delay)
+                    else:
+                        raise
+        finally:
+            s.stop()
 
     def create_group(self, name, description, auth_ssh=False, auth_rdp=False,
                      auth_group_traffic=False, vpc_id=None):
-        raise NotImplementedError()
+        """
+        Create security group with name/description. auth_ssh=True
+        will open port 22 to world (0.0.0.0/0). auth_group_traffic
+        will allow all traffic between instances in the same security
+        group
+        """
+        log.info("Creating security group %s..." % name)
+        # sg = self.conn.create_security_group(name, description, vpc_id=vpc_id)
+        # if not self.get_group_or_none(name):
+        #     s = utils.get_spinner("Waiting for security group %s..." % name)
+        #     try:
+        #         while not self.get_group_or_none(name):
+        #             time.sleep(3)
+        #     finally:
+        #         s.stop()
+        # if auth_ssh:
+        #     ssh_port = static.DEFAULT_SSH_PORT
+        #     sg.authorize(ip_protocol='tcp', from_port=ssh_port,
+        #                  to_port=ssh_port, cidr_ip=static.WORLD_CIDRIP)
+        # if auth_rdp:
+        #     rdp_port = static.DEFAULT_RDP_PORT
+        #     sg.authorize(ip_protocol='tcp', from_port=rdp_port,
+        #                  to_port=rdp_port, cidr_ip=static.WORLD_CIDRIP)
+        # if auth_group_traffic:
+        #     sg.authorize(src_group=sg, ip_protocol='icmp', from_port=-1,
+        #                  to_port=-1)
+        #     sg.authorize(src_group=sg, ip_protocol='tcp', from_port=1,
+        #                  to_port=65535)
+        #     sg.authorize(src_group=sg, ip_protocol='udp', from_port=1,
+        #                  to_port=65535)
+        # return sg
+        sg = self.get_or_create_placement_group(name)
+        if not sg:
+            raise exception.PlacementGroupDoesNotExist(name)
+        return sg
 
     def get_all_security_groups(self, groupnames=[]):
-        raise NotImplementedError()
+        """
+        Returns all security groups
+
+        groupnames - optional list of group names to retrieve
+        """
+        filters = {}
+        if groupnames:
+            filters = {'group-name': groupnames}
+        return self.get_security_groups(filters=filters)
 
     def get_group_or_none(self, name):
-        raise NotImplementedError()
+        """
+        Returns group with name if it exists otherwise returns None
+        """
+        try:
+            return self.get_security_group(name)
+        except exception.SecurityGroupDoesNotExist:
+            pass
 
     def get_or_create_group(self, name, description, auth_ssh=True,
                             auth_group_traffic=False, vpc_id=None):
-        raise NotImplementedError()
+        """
+        Try to return a security group by name. If the group is not found,
+        attempt to create it.  Description only applies to creation.
+
+        auth_ssh - authorize ssh traffic from world
+        auth_group_traffic - authorizes all traffic between members of the
+                             group
+        """
+        sg = self.get_group_or_none(name)
+        if not sg:
+            sg = self.create_group(name, description, auth_ssh=auth_ssh,
+                                   auth_group_traffic=auth_group_traffic,
+                                   vpc_id=vpc_id)
+        return sg
 
     def get_security_group(self, groupname):
-        raise NotImplementedError()
+        try:
+            return self.get_security_groups(
+                filters={'group-name': groupname})[0]
+        except azure.WindowsAzureError as e:
+            # if e.error_code == "InvalidGroup.NotFound":
+            #     raise exception.SecurityGroupDoesNotExist(groupname)
+            raise
+        except IndexError:
+            raise exception.SecurityGroupDoesNotExist(groupname)
 
     def get_security_groups(self, filters=None):
-        raise NotImplementedError()
-
-    def get_all_hosted_services(self):
-        services = []
-        hosted_services = self.conn.list_hosted_services()
-        for service in hosted_services:
-            services.append(service.service_name)
-        return services
+        """
+        Returns all security groups on this cloud account
+        """
+        #return self.conn.get_all_security_groups(filters=filters)
+        pgs =  self.get_placement_groups(filters)
+        sgs = [SecurityGroup(pg, self) for pg in pgs]
+        return sgs
 
 
     def get_permission_or_none(self, group, ip_protocol, from_port, to_port,
@@ -250,22 +357,113 @@ class EasySMS(EasyAzure):
     def has_permission(self, group, ip_protocol, from_port, to_port, cidr_ip):
         raise NotImplementedError()
 
+    def _azurify(self, name):
+        return '%s-%s' % (name.strip('@').replace('_', '-'), self.subscription_name)
+
+    @classmethod
+    def _unazurify(self, name):
+        return '@tc-%s' % ('_'.join(name.split('-')[1:-1])) #TODO this will not restore '-' if it was originally present
+
     def create_placement_group(self, name):
-        raise NotImplementedError()
+        """
+        Create a new placement group for your account.
+        This will create the placement group within the region you
+        are currently connected to.
+        """
+        log.info("Creating placement group %s..." % name)
+        # success = self.conn.create_placement_group(name)
+        # if not success:
+        #     log.debug(
+        #         "failed to create placement group '%s' (error = %s)" %
+        #         (name, success))
+        #     raise exception.AWSError(
+        #         "failed to create placement group '%s'" % name)
+        # pg = self.get_placement_group_or_none(name)
+        # while not pg:
+        #     log.info("Waiting for placement group %s..." % name)
+        #     time.sleep(3)
+        #     pg = self.get_placement_group_or_none(name)
+        # return pg
+
+        name = self._azurify(name)
+        available = self.conn.check_hosted_service_name_availability(name).result
+        if available:
+            self.conn.create_hosted_service(service_name=name,
+                label=name,
+                description='TethysCluster-%s' % static.VERSION.replace('.', '_'),
+                location=self.region.name)
+
+            service = self.conn.get_hosted_service_properties(name)
+
+            return service
+        else:
+            raise azure.WindowsAzureError('Hosted Service already exists')
 
     def get_placement_groups(self, filters=None):
-        raise NotImplementedError()
+        """
+        Returns all hosted services
+        """
+        #return self.conn.get_all_placement_groups(filters=filters)
+        hosted_services = self.list_all_hosted_services()
+        group_names = filters['group-name']
+        group_names = group_names if isinstance(group_names, list) else [group_names]
+        group_names = [self._azurify(name) for name in group_names]
+        #'''
+        def match(name, filters):
+            for filter in filters:
+                if fnmatch.fnmatch(name, filter):
+                    return True
+            return False
+        services = [self.conn.get_hosted_service_properties(service_name) for service_name in hosted_services if
+                    match(service_name, group_names)]
+        '''
+        services = []
+        for group_name in group_names:
+            srvs = fnmatch.filter(hosted_services, group_name)
+            services.extend([self.conn.get_hosted_service_properties(service_name) for service_name in srvs])
+        #'''
+
+        return services
 
     def get_placement_group(self, groupname=None):
-        raise NotImplementedError()
+        try:
+            return self.get_placement_groups(filters={'group-name':
+                                                      groupname})[0]
+        except azure.WindowsAzureError as e:
+            # if e.error_code == "InvalidPlacementGroup.Unknown":
+            #     raise exception.PlacementGroupDoesNotExist(groupname)
+            raise
+        except IndexError:
+            raise exception.PlacementGroupDoesNotExist(groupname)
 
     def get_placement_group_or_none(self, name):
-        raise NotImplementedError()
+        """
+        Returns placement group with name if it exists otherwise returns None
+        """
+        try:
+            return self.get_placement_group(name)
+        except exception.PlacementGroupDoesNotExist:
+            pass
 
     def get_or_create_placement_group(self, name):
-        raise NotImplementedError()
+        """
+        Try to return a placement group by name.
+        If the group is not found, attempt to create it.
+        """
+        try:
+            return self.get_placement_group(name)
+        except exception.PlacementGroupDoesNotExist:
+            pg = self.create_placement_group(name)
+            return pg
 
-    def request_instances(self, image_id, price=None, instance_type='m1.small',
+    def list_all_hosted_services(self):
+        services = []
+        hosted_services = self.conn.list_hosted_services()
+        for service in hosted_services:
+            services.append(service.service_name)
+        return services
+
+    def request_instances(self, image_id, price=None, instance_type='Small',
                           min_count=1, max_count=1, count=1, key_name=None,
                           security_groups=None, security_group_ids=None,
                           launch_group=None,
@@ -276,60 +474,21 @@ class EasySMS(EasyAzure):
         """
         Convenience method for running spot or flat-rate instances
         """
-        if not block_device_map:
-            img = self.get_image(image_id)
-            instance_store = img.root_device_type == 'instance-store'
-            if instance_type == 'm1.small' and img.architecture == "i386":
-                # Needed for m1.small + 32bit AMI (see gh-329)
-                instance_store = True
-            use_ephemeral = instance_type != 't1.micro'
-            bdmap = self.create_block_device_map(
-                add_ephemeral_drives=use_ephemeral,
-                num_ephemeral_drives=24,
-                instance_store=instance_store)
-            # Prune drives from runtime block device map that may override EBS
-            # volumes specified in the AMIs block device map
-            for dev in img.block_device_mapping:
-                bdt = img.block_device_mapping.get(dev)
-                if not bdt.ephemeral_name and dev in bdmap:
-                    log.debug("EBS volume already mapped to %s by AMI" % dev)
-                    log.debug("Removing %s from runtime block device map" %
-                              dev)
-                    bdmap.pop(dev)
-            if img.root_device_name in img.block_device_mapping:
-                log.debug("Forcing delete_on_termination for AMI: %s" % img.id)
-                root = img.block_device_mapping[img.root_device_name]
-                # specifying the AMI's snapshot in the custom block device
-                # mapping when you dont own the AMI causes an error on launch
-                root.snapshot_id = None
-                root.delete_on_termination = True
-                # AWS API doesn't support any value for this flag for the root
-                # device of a new instance (see: boto#2587)
-                if hasattr(root, 'encrypted'):
-                    root.encrypted = None
-                bdmap[img.root_device_name] = root
-            block_device_map = bdmap
-        shared_kwargs = dict(instance_type=instance_type,
-                             key_name=key_name,
-                             subnet_id=subnet_id,
-                             placement=placement,
-                             placement_group=placement_group,
-                             user_data=user_data,
-                             block_device_map=block_device_map,
-                             network_interfaces=network_interfaces)
-        if price:
-            return self.request_spot_instances(
-                price, image_id,
-                count=count, launch_group=launch_group,
-                security_group_ids=security_group_ids,
-                availability_zone_group=availability_zone_group,
-                **shared_kwargs)
-        else:
-            return self.run_instances(
-                image_id,
-                min_count=min_count, max_count=max_count,
-                security_groups=security_groups,
-                **shared_kwargs)
+        #I just deleted a bunch of code that handled block device maps. I'm not sure how this applies in Azure
+
+        kwargs = dict(min_count=min_count,
+                      max_count=max_count,
+                      security_groups=security_groups,
+                      instance_type=instance_type,
+                      key_name=key_name,
+                      subnet_id=subnet_id,
+                      placement=placement,
+                      placement_group=placement_group,
+                      user_data=user_data,
+                      block_device_map=block_device_map,
+                      network_interfaces=network_interfaces)
+
+        return self.run_instances(**kwargs)
 
     def request_spot_instances(self, price, image_id, instance_type='m1.small',
                                count=1, launch_group=None, key_name=None,
@@ -342,29 +501,69 @@ class EasySMS(EasyAzure):
 
     def _wait_for_propagation(self, obj_ids, fetch_func, id_filter, obj_name,
                               max_retries=60, interval=5):
-        raise NotImplementedError()
+        """
+        Wait for a list of object ids to appear in the Azure API. Requires a
+        function that fetches the objects and also takes a filters kwarg. The
+        id_filter specifies the id filter to use for the objects and
+        obj_name describes the objects for log messages.
+        """
+        filters = {id_filter: obj_ids}
+        num_objs = len(obj_ids)
+        num_reqs = 0
+        reqs_ids = []
+        max_retries = max(1, max_retries)
+        interval = max(1, interval)
+        widgets = ['', progressbar.Fraction(), ' ',
+                   progressbar.Bar(marker=progressbar.RotatingMarker()), ' ',
+                   progressbar.Percentage(), ' ', ' ']
+        log.info("Waiting for %s to propagate..." % obj_name)
+        pbar = progressbar.ProgressBar(widgets=widgets,
+                                       maxval=num_objs).start()
+        try:
+            for i in range(max_retries + 1):
+                reqs = fetch_func(filters=filters)
+                reqs_ids = [req.id for req in reqs]
+                num_reqs = len(reqs)
+                pbar.update(num_reqs)
+                if num_reqs != num_objs:
+                    log.debug("%d: only %d/%d %s have "
+                              "propagated - sleeping..." %
+                              (i, num_reqs, num_objs, obj_name))
+                    if i != max_retries:
+                        time.sleep(interval)
+                else:
+                    return
+        finally:
+            if not pbar.finished:
+                pbar.finish()
+        missing = [oid for oid in obj_ids if oid not in reqs_ids]
+        raise exception.PropagationException(
+            "Failed to fetch %d/%d %s after %d seconds: %s" %
+            (num_reqs, num_objs, obj_name, max_retries * interval,
+             ', '.join(missing)))
 
     def wait_for_propagation(self, instances=None, spot_requests=None,
                              max_retries=60, interval=5):
-        raise NotImplementedError()
+        """
+        Wait for newly created instances to register in
+        the Azure API by repeatedly calling get_all_instances.
+        Calling this method directly after creating new instances or spot
+        requests before operating on them helps to avoid eventual consistency
+        errors about instances not existing.
+        """
+        if instances:
+            instance_ids = [getattr(i, 'id', i) for i in instances]
+            self._wait_for_propagation(
+                instance_ids, self.get_all_instances, 'instance-id',
+                'instances', max_retries=max_retries, interval=interval)
 
-    def run_instances(self, image_id, aliases=None, service_name=None, instance_type='Small', key_name=None,
-                      security_groups=None, user_data=None):
+    def run_instances(self, image_id, aliases=None, placement_group=None, instance_type='Small', key_name=None,
+                      security_groups=None, user_data=None, **kwargs):
 
         user_name='tethysadmin'
         password = '@tc-tethysadmin1'
 
-
-        # start = time.time()
-        # image = self.conn.list_vm_images(filters={'label':image_id})[0]
-        # print time.time()-start
-        # start = time.time()
-        images = self.conn.list_vm_images()
-        image = None
-        for i in images:
-            if i.name == image_id:
-                image = i
-        # print time.time()-start
+        image = self.get_image(image_id)
         os = image.os_disk_configuration.os
         if os =='Windows':
             hostname = 'computer_name'
@@ -382,6 +581,14 @@ class EasySMS(EasyAzure):
                                                   user_password=password,
                                                   disable_ssh_password_authentication=False,
                                                   custom_data=user_data)
+            # ssh = SSH()
+            # fingerprint = None
+            # path = None
+            # public_key = PublicKey(fingerprint, path)
+            # key_pairs = KeyPair(fingerprint, path)
+            # ssh.public_keys.public_keys.append(public_key)
+            # ssh.key_pairs.key_pairs.append(key_pairs)
+            # system_config.ssh = ssh
         else:
             raise Exception('%s is not a supported os' % (os,))
 
@@ -410,7 +617,7 @@ class EasySMS(EasyAzure):
 
 
         for alias in aliases:
-            print alias
+            # print alias
             rdp_port = 3389
             ssh_port = 22
             alias_parts = re.split('node', alias)
@@ -419,8 +626,8 @@ class EasySMS(EasyAzure):
                 rdp_port = '33' + index
                 ssh_port = '22' + index
             system_config.__dict__[hostname] = alias
-            kwargs = dict(service_name=service_name,
-                          deployment_name=service_name,
+            kwargs = dict(service_name=placement_group,
+                          deployment_name=placement_group,
                           role_name=alias,
                           system_config=system_config,
                           os_virtual_hard_disk=None,
@@ -430,7 +637,7 @@ class EasySMS(EasyAzure):
                           )
 
             try:
-                deployment = self.conn.get_deployment_by_name(service_name, service_name)
+                deployment = self.conn.get_deployment_by_name(placement_group, placement_group)
             except WindowsAzureMissingResourceError as e:
                 deployment = None
             if not deployment:
@@ -438,7 +645,10 @@ class EasySMS(EasyAzure):
                                                                   **kwargs).request_id
             else:
                 id = self.conn.add_role(**kwargs).request_id
-            self.conn.wait_for_operation_status(id, timeout=60)
+            self.conn.wait_for_operation_status(id, timeout=300, progress_callback=lambda x: sys.stdout.write(''),
+                                                success_callback=lambda  x: sys.stdout.write(''))
+
+        return self.get_all_instances(aliases)
 
     def create_image(self, instance_id, name, description=None,
                      no_reboot=False):
@@ -461,13 +671,26 @@ class EasySMS(EasyAzure):
         raise NotImplementedError()
 
     def get_keypairs(self, filters={}):
-        raise NotImplementedError()
+        certs = self.conn.list_management_certificates().subscription_certificates
+        for cert in certs:
+            cert.fingerprint = cert.subscription_certificate_thumbprint
+        return certs
 
     def get_keypair(self, keypair):
-        raise NotImplementedError()
+        try:
+            return self.get_keypairs(filters={'key-name': keypair})[0]
+        except azure.WindowsAzureError as e:
+            # if e.error_code == "InvalidKeyPair.NotFound":
+            #     raise exception.KeyPairDoesNotExist(keypair)
+            raise
+        except IndexError:
+            raise exception.KeyPairDoesNotExist(keypair)
 
     def get_keypair_or_none(self, keypair):
-        raise NotImplementedError()
+        try:
+            return self.get_keypair(keypair)
+        except exception.KeyPairDoesNotExist:
+            pass
 
     def __print_header(self, msg):
         raise NotImplementedError()
@@ -482,38 +705,66 @@ class EasySMS(EasyAzure):
         raise NotImplementedError()
 
     def get_all_instances(self, instance_ids=[], filters={}):
-        hosted_services = self.get_all_hosted_services()
+        if 'instance.group-name' in filters.keys():
+            hosted_services = [self._azurify(filters['instance.group-name'])]
+        else:
+            hosted_services = self.list_all_hosted_services()
         instances = []
-        roles = []
         for name in hosted_services:
             service = self.conn.get_hosted_service_properties(name, True)
             for deployment in service.deployments.deployments:
-                instances.extend(deployment.role_instance_list.role_instances)
-                roles.extend(deployment.role_list.roles)
-            # insts = [role for role in [deployment.role_instance_list.role_instances for
-            #                     deployment in service.deployments.deployments]]
+                id = (name, deployment.name, )
+                insts = deployment.role_instance_list.role_instances
+                rols = deployment.role_list.roles
+                assert len(insts) == len(rols)
+                for i in range(0,len(insts)):
+                    role = rols[i]
+                    if role.role_type == 'PersistentVMRole':
+                        instance = Instance(service, deployment, insts[i], role, self)
+                        instances.append(instance)
 
-        # pprint(instances[0].__dict__)
-        # pprint(roles[0].__dict__)
+        if instance_ids:
+            instances = [instance for instance in instances if instance.id in instance_ids]
+        if filters:
+            # filters = {'instance-state-name': states,
+            #        'instance.group-name': self._security_group}
+            if 'instance-state-name' in filters.keys():
+                states = filters['instance-state-name']
+                states = states if isinstance(states, list) else [states]
+                instances = [instance for instance in instances if instance.state in states]
+            if 'instance-id' in filters.keys():
+                instance_ids = filters['instance-id']
+                instance_ids = instance_ids if isinstance(instance_ids, list) else [instance_ids]
+                instances = [instance for instance in instances if instance.id in instance_ids]
 
         return instances
 
-            # props = sms.get_hosted_service_properties(service.service_name, True)
-            # if len(props.deployments) > 0 and len(props.deployments[0].role_list) > 0:
-            #     if props.deployments[0].role_list[0].role_type == 'PersistentVMRole':
-            #         print(props.deployments[0].role_list[0].role_name)
-
     def get_instance(self, instance_id):
-        raise NotImplementedError()
+        try:
+            return self.get_all_instances(
+                filters={'instance-id': instance_id})[0]
+        except azure.WindowsAzureError as e:
+            # if e.error_code == "InvalidInstanceID.NotFound":
+            #     raise exception.InstanceDoesNotExist(instance_id)
+            raise
+        except IndexError:
+            raise exception.InstanceDoesNotExist(instance_id)
 
     def is_valid_conn(self):
-        raise NotImplementedError()
+        try:
+            self.get_all_instances()
+            return True
+        except azure.WindowsAzureError as e:
+            cred_errs = [] #add error codes for Azure authorization errors here
+            # if e.error_code in cred_errs:
+            #     return False
+            raise
 
     def get_all_spot_requests(self, spot_ids=[], filters=None):
-        raise NotImplementedError()
+        return None
 
     def list_all_spot_instances(self, show_closed=False):
-        raise NotImplementedError()
+        return None
 
     def show_instance(self, instance):
         raise NotImplementedError()
@@ -577,13 +828,42 @@ class EasySMS(EasyAzure):
         raise NotImplementedError()
 
     def get_images(self, filters=None):
-        raise NotImplementedError()
+        # start = time.time()
+        # image = self.conn.list_vm_images(filters={'name':image_id})[0]
+        # print time.time()-start
+        # start = time.time()
+        image_id = filters['image-id']
+        all_images = self.conn.list_vm_images()
+        images = []
+        for image in all_images:
+            if image.name == image_id:
+                images.append(image)
+        # print time.time()-start
+        return images
 
     def get_image(self, image_id):
-        raise NotImplementedError()
+        """
+        Return image object representing an AMI.
+        Raises exception.AMIDoesNotExist if unsuccessful
+        """
+        try:
+            return self.get_images(filters={'image-id': image_id})[0]
+        except azure.WindowsAzureError as e:
+            # if e.error_code == "InvalidAMIID.NotFound":
+            #     raise exception.AMIDoesNotExist(image_id)
+            raise
+        except IndexError:
+            raise exception.AMIDoesNotExist(image_id)
 
     def get_image_or_none(self, image_id):
-        raise NotImplementedError()
+        """
+        Return image object representing an AMI.
+        Returns None if unsuccessful
+        """
+        try:
+            return self.get_image(image_id)
+        except exception.AMIDoesNotExist:
+            pass
 
     def get_image_files(self, image):
         raise NotImplementedError()
@@ -715,6 +995,96 @@ class EasyAzureStorage(EasyAzure):
     def get_bucket_files(self, bucketname):
         raise NotImplementedError()
 
+class SecurityGroup(object):
+    def __init__(self, service, easy_sms ):
+        self.name = easy_sms._unazurify(service.service_name)
+        self.connection = easy_sms
+        self.tags = dict()
+        self.vpc_id = None
+        self.id = service.service_name
+
+    def instances(self):
+        return self.connection.get_all_instances(filters={'instance.group-name': self.name})
+
+class Instance(object):
+
+    POWER_STATES = {'Starting':'pending', 'Started':'running' , 'Stopping':'stopping', 'Stopped':'stopped', 'Unknown':'terminated'}
+
+    def __init__(self, service, deployment, role_instance, role, conn):
+        self.role_instance = role_instance
+        self.role = role
+        self.ports = dict()
+        for endpoint in role_instance.instance_endpoints:
+            self.ports[endpoint.name] = int(endpoint.public_port)
+
+        self.id = (service.service_name, deployment.name, role.role_name)
+        self.public_dns_name = deployment.url
+        self.private_dns_name = deployment.url
+        self.state = self.POWER_STATES[role_instance.power_state]
+        self.state_code = None
+        self.previous_state = None
+        self.previous_state_code = None
+        self.key_name = 'tethyscert'
+        self.instance_type = role.role_size
+        self.launch_time = deployment.created_time
+        self.image_id = role.os_virtual_hard_disk.source_image_name
+        self.placement = None
+        self.placement_group = service.service_name
+        self.placement_tenancy = None
+        self.kernel = None
+        self.ramdisk = None
+        self.architecture = None
+        self.hypervisor = None
+        self.virtualization_type = None
+        self.product_codes = None
+        self.ami_launch_index = None
+        self.monitored = None
+        self.monitoring_state = None
+        self.spot_instance_request_id = None
+        self.subnet_id = None
+        self.vpc_id = None
+        self.private_ip_address = role_instance.ip_address
+        self.ip_address = role_instance.instance_endpoints[0].vip
+        self.platform = role.os_virtual_hard_disk.os.lower()
+        self.root_device_name = None
+        self.root_device_type = None
+        self.block_device_mapping = None
+        self.state_reason = role_instance.instance_state_details
+        self.groups = None
+        self.interfaces = None
+        self.ebs_optimized = None
+        self.instance_profile = None
+
+        self.connection = conn
+        self.dns_name = self.ip_address #for some reason ssh not working with: deployment.url
+        self.tags = dict()
+        self.add_tag('alias', role.role_name)
+        self.add_tag('Name', role.role_name)
+
+    def add_tag(self, k, v):
+        self.tags[k]=v
+
+    def terminate(self):
+        try:
+            self._terminate_role(max_tries=5, timeout=20)
+        except azure.WindowsAzureError, e:
+            try:
+                self.connection.conn.delete_deployment(self.id[0], self.id[1])
+            except WindowsAzureMissingResourceError, e:
+                pass
+
+    def _terminate_role(self, max_tries=1, timeout=30):
+        try:
+            self.connection.conn.delete_role(*self.id)
+        except WindowsAzureConflictError, e:
+            max_tries -= 1
+            if max_tries < 1:
+                raise
+            log.warn('Waiting for instance to be available...')
+            time.sleep(timeout)
+            self._terminate_role(max_tries, timeout)
+
+
 if __name__ == "__main__":
     # from tethyscluster.config import get_easy_ec2
     # ec2 = get_easy_ec2()
@@ -793,6 +1163,10 @@ if __name__ == "__main__":
 
 
 
+            # props = sms.get_hosted_service_properties(service.service_name, True)
+            # if len(props.deployments) > 0 and len(props.deployments[0].role_list) > 0:
+            #     if props.deployments[0].role_list[0].role_type == 'PersistentVMRole':
+            #         print(props.deployments[0].role_list[0].role_name)
 
 
 

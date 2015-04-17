@@ -20,6 +20,6 @@ class Manager(object):
     """
     Base class for all Manager classes in TethysCluster
     """
-    def __init__(self, cfg, ec2=None):
+    def __init__(self, cfg, cloud=None):
         self.cfg = cfg
-        self.ec2 = ec2 or cfg.get_easy_ec2()
+        self.cloud = cloud or cfg.get_easy_cloud()

@@ -125,7 +125,7 @@ class S3ImageCreator(ImageCreator):
         }
 
     def __repr__(self):
-        return "<S3ImageCreator: %s>" % self.host.id
+        return "<S3ImageCreator: %s>" % (self.host.id,)
 
     @print_timing
     def create_image(self):
@@ -247,7 +247,7 @@ class EBSImageCreator(ImageCreator):
                 log.error("Removing generated snapshot '%s'" % self._snap)
                 self._snap.delete()
             if self._vol:
-                log.error("Removing generated volume '%s'" % self._vol.id)
+                log.error("Removing generated volume '%s'" % (self._vol.id,))
                 self._vol.detach(force=True)
                 self._vol.delete()
             raise
@@ -295,7 +295,7 @@ class EBSImageCreator(ImageCreator):
         log.info("Creating new EBS-backed image from instance-store instance")
         log.info("Creating new root volume...")
         vol = self._vol = self.ec2.create_volume(size, host.placement)
-        log.info("Created new volume: %s" % vol.id)
+        log.info("Created new volume: %s" % (vol.id,))
         while vol.update() != 'available':
             time.sleep(5)
         dev = None
@@ -310,7 +310,7 @@ class EBSImageCreator(ImageCreator):
             time.sleep(5)
         while not host_ssh.path_exists(dev):
             time.sleep(5)
-        log.info("Formatting %s..." % vol.id)
+        log.info("Formatting %s..." % (vol.id,))
         host_ssh.execute('mkfs.ext3 -F %s' % dev, silent=False)
         log.info("Setting filesystem label on %s" % dev)
         host_ssh.execute('e2label %s /' % dev)
@@ -325,7 +325,7 @@ class EBSImageCreator(ImageCreator):
         fstab = host_ssh.remote_file('/etc/fstab', 'a')
         fstab.write('/dev/sdb1 /mnt auto defaults,nobootwait 0 0\n')
         fstab.close()
-        log.info("Syncing root filesystem to new volume (%s)" % vol.id)
+        log.info("Syncing root filesystem to new volume (%s)" % (vol.id,))
         host_ssh.execute(
             'rsync -aqx --exclude %(mpt)s --exclude /root/.ssh / %(mpt)s' %
             {'mpt': mount_point}, silent=False)
@@ -339,10 +339,10 @@ class EBSImageCreator(ImageCreator):
         snap = self._snap = self.ec2.create_snapshot(vol,
                                                      description=sdesc,
                                                      wait_for_snapshot=True)
-        log.info("New snapshot created: %s" % snap.id)
-        log.info("Removing generated volume %s" % vol.id)
+        log.info("New snapshot created: %s" % (snap.id,))
+        log.info("Removing generated volume %s" % (vol.id,))
         vol.delete()
-        log.info("Creating root block device map using snapshot %s" % snap.id)
+        log.info("Creating root block device map using snapshot %s" % (snap.id,))
         bmap = self.ec2.create_block_device_map(root_snapshot_id=snap.id,
                                                 instance_store=True,
                                                 num_ephemeral_drives=1,

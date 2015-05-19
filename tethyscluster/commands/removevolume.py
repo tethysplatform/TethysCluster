@@ -60,6 +60,6 @@ class CmdRemoveVolume(VolumeCompleter):
                     log.info("Aborting...")
                     return
             if vol.delete():
-                log.info("Volume %s deleted successfully" % vol.id)
+                log.info("Volume %s deleted successfully" % (vol.id,))
             else:
-                log.error("Error deleting volume %s" % vol.id)
+                log.error("Error deleting volume %s" % (vol.id,))

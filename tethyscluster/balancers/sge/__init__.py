@@ -265,7 +265,7 @@ class SGEStats(object):
             if nodename in qn:
                 log.debug("Node %s is working" % node.alias)
                 return True
-        log.debug("Node %s is IDLE" % node.id)
+        log.debug("Node %s is IDLE" % (node.id,))
         return False
 
     def num_slots_for_job(self, job_id):

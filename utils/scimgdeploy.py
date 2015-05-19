@@ -78,7 +78,7 @@ def deploy_img(img_path, vol_size, arch, region, src_ami, dev=None,
     while not host.ssh.path_exists(realdev):
         time.sleep(10)
     s.stop()
-    log.info("Installing image on volume %s ..." % vol.id)
+    log.info("Installing image on volume %s ..." % (vol.id,))
     host.ssh.execute("cat /mnt/%s > %s" % (bname, realdev))
     log.info("Checking filesystem...")
     host.ssh.execute("e2fsck -pf %s" % realdev)
@@ -104,9 +104,9 @@ def deploy_img(img_path, vol_size, arch, region, src_ami, dev=None,
         oldsnap_id = oldimg.block_device_mapping['/dev/sda1'].snapshot_id
         oldsnap = ec2.get_snapshot(oldsnap_id)
         if remove_old:
-            log.info("Deregistering old AMI: %s" % oldimg.id)
+            log.info("Deregistering old AMI: %s" % (oldimg.id,))
             oldimg.deregister()
-            log.info("Deleting old snapshot: %s" % oldsnap.id)
+            log.info("Deleting old snapshot: %s" % (oldsnap.id,))
             oldsnap.delete()
         else:
             log.info("Existing image %s already has name '%s'" %

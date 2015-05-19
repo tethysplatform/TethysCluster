@@ -76,7 +76,7 @@ class VolumeCreator(cluster.Cluster):
         active_states = ['pending', 'running']
         i = self._host_instance
         if i and self._validate_host_instance(i, zone):
-            log.info("Using specified host instance %s" % i.id)
+            log.info("Using specified host instance %s" % (i.id,))
             return i
         for node in self.nodes:
             if node.state in active_states and node.placement == zone:
@@ -108,13 +108,13 @@ class VolumeCreator(cluster.Cluster):
     def _create_volume(self, size, zone, snapshot_id=None):
         vol = self.ec2.create_volume(size, zone, snapshot_id)
         self._volume = vol
-        log.info("New volume id: %s" % vol.id)
+        log.info("New volume id: %s" % (vol.id,))
         self.ec2.wait_for_volume(vol, status='available')
         return vol
 
     def _create_snapshot(self, volume):
         snap = self.ec2.create_snapshot(volume, wait_for_snapshot=True)
-        log.info("New snapshot id: %s" % snap.id)
+        log.info("New snapshot id: %s" % (snap.id,))
         self._snapshot = snap
         return snap
 
@@ -258,7 +258,7 @@ class VolumeCreator(cluster.Cluster):
             log.info("Leaving volume %s attached to instance %s" %
                      (vol.id, host.id))
         if self._shutdown:
-            log.info("Terminating host instance %s" % host.id)
+            log.info("Terminating host instance %s" % (host.id,))
             host.terminate()
         else:
             log.info("Not terminating host instance %s" %
@@ -270,7 +270,7 @@ class VolumeCreator(cluster.Cluster):
         """
         newvol = self._volume
         if newvol:
-            log.error("Detaching and deleting *new* volume: %s" % newvol.id)
+            log.error("Detaching and deleting *new* volume: %s" % (newvol.id,))
             if newvol.update() != 'available':
                 newvol.detach(force=True)
                 self.ec2.wait_for_volume(newvol, status='available')
@@ -355,7 +355,7 @@ class VolumeCreator(cluster.Cluster):
             else:
                 raise exception.InvalidOperation(
                     "EBS volume %s has more than 1 partition. "
-                    "You must resize this volume manually" % vol.id)
+                    "You must resize this volume manually" % (vol.id,))
             if resizefs_exe == "resize2fs":
                 log.info("Running e2fsck on new volume")
                 host.ssh.execute("e2fsck -y -f %s" % device)
@@ -364,13 +364,13 @@ class VolumeCreator(cluster.Cluster):
             self.shutdown()
             return new_vol.id
         except Exception:
-            log.error("Failed to resize volume %s" % vol.id)
+            log.error("Failed to resize volume %s" % (vol.id,))
             self._delete_new_volume()
             raise
         finally:
             snap = self._snapshot
             if snap:
                 log_func = log.info if self._volume else log.error
-                log_func("Deleting snapshot %s" % snap.id)
+                log_func("Deleting snapshot %s" % (snap.id,))
                 snap.delete()
             self._warn_about_volume_hosts()

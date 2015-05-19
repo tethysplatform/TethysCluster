@@ -41,9 +41,6 @@ from tethyscluster.utils import print_timing
 from tethyscluster.templates import user_msgs
 from tethyscluster.logger import log
 
-from tethyscluster import azureutils
-from tethyscluster.azurecluster import AzureCluster
-
 
 class ClusterManager(managers.Manager):
     """
@@ -62,12 +59,9 @@ class ClusterManager(managers.Manager):
             cltag = self.get_tag_from_sg(clname)
             if not group:
                 group = self.cloud.get_security_group(clname)
-            if isinstance(self.cloud, azureutils.EasyAzure):
-                cl = AzureCluster(cloud_conn=self.cloud, cluster_tag=cltag,
-                             cluster_group=group)
-            else:
-                cl = Cluster(ec2_conn=self.cloud, cluster_tag=cltag,
-                             cluster_group=group)
+
+            cl = Cluster(cloud_conn=self.cloud, cluster_tag=cltag,
+                         cluster_group=group)
             if load_receipt:
                 cl.load_receipt(load_plugins=load_plugins,
                                 load_volumes=load_volumes)
@@ -392,7 +386,8 @@ class ClusterManager(managers.Manager):
 class Cluster(object):
 
     def __init__(self,
-                 ec2_conn=None,
+                 cloud_conn=None,
+                 cloud_provider=None,
                  spot_bid=None,
                  cluster_tag=None,
                  cluster_description=None,
@@ -425,7 +420,7 @@ class Cluster(object):
         # update class vars with given vars
         _vars = locals().copy()
         del _vars['cluster_group']
-        del _vars['ec2_conn']
+        del _vars['cloud_conn']
         self.__dict__.update(_vars)
 
         # more configuration
@@ -434,7 +429,7 @@ class Cluster(object):
             self.cluster_tag = "cluster%s" % now
         if cluster_description is None:
             self.cluster_description = "Cluster created at %s" % now
-        self.ec2 = ec2_conn
+        self.cloud = cloud_conn
         self.cluster_size = cluster_size or 0
         self.volumes = self.load_volumes(volumes)
         self.plugins = self.load_plugins(plugins)
@@ -474,11 +469,11 @@ class Cluster(object):
         """
         zone = None
         if self.availability_zone:
-            zone = self.ec2.get_zone(self.availability_zone)
+            zone = self.cloud.get_zone(self.availability_zone)
         common_zone = None
         for volume in self.volumes:
             volid = self.volumes.get(volume).get('volume_id')
-            vol = self.ec2.get_volume(volid)
+            vol = self.cloud.get_volume(volid)
             if not common_zone:
                 common_zone = vol.zone
             elif vol.zone != common_zone:
@@ -488,10 +483,10 @@ class Cluster(object):
         if common_zone and zone and zone.name != common_zone:
             raise exception.InvalidZone(zone.name, common_zone)
         if not zone and common_zone:
-            zone = self.ec2.get_zone(common_zone)
+            zone = self.cloud.get_zone(common_zone)
         if not zone:
             try:
-                zone = self.ec2.get_zone(self.master_node.placement)
+                zone = self.cloud.get_zone(self.master_node.placement)
             except exception.MasterDoesNotExist:
                 pass
         return zone
@@ -644,20 +639,20 @@ class Cluster(object):
     @property
     def subnet(self):
         if not self._subnet and self.subnet_id:
-            self._subnet = self.ec2.get_subnet(self.subnet_id)
+            self._subnet = self.cloud.get_subnet(self.subnet_id)
         return self._subnet
 
     @property
     def cluster_group(self):
         if self._cluster_group:
             return self._cluster_group
-        sg = self.ec2.get_group_or_none(self._security_group)
+        sg = self.cloud.get_group_or_none(self._security_group)
         if not sg:
             desc = 'TethysCluster-%s' % static.VERSION.replace('.', '_')
             if self.subnet:
                 desc += ' (VPC)'
             vpc_id = getattr(self.subnet, 'vpc_id', None)
-            sg = self.ec2.create_group(self._security_group,
+            sg = self.cloud.create_group(self._security_group,
                                        description=desc,
                                        auth_ssh=True,
                                        auth_rdp=True,
@@ -676,7 +671,7 @@ class Cluster(object):
             from_port = perm.get('from_port')
             to_port = perm.get('to_port')
             cidr_ip = perm.get('cidr_ip', static.WORLD_CIDRIP)
-            if not self.ec2.has_permission(sg, ip_protocol, from_port,
+            if not self.cloud.has_permission(sg, ip_protocol, from_port,
                                            to_port, cidr_ip):
                 log.info("Opening %s port range %s-%s for CIDR %s" %
                          (ip_protocol, from_port, to_port, cidr_ip))
@@ -738,7 +733,7 @@ class Cluster(object):
     @property
     def placement_group(self):
         if self._placement_group is None:
-            pg = self.ec2.get_or_create_placement_group(self._security_group)
+            pg = self.cloud.get_or_create_placement_group(self._security_group)
             self._placement_group = pg
         return self._placement_group
 
@@ -758,13 +753,13 @@ class Cluster(object):
         states = ['pending', 'running', 'stopping', 'stopped']
         filters = {'instance-state-name': states,
                    'instance.group-name': self._security_group}
-        nodes = self.ec2.get_all_instances(filters=filters)
-        # remove any cached nodes not in the current node list from EC2
+        nodes = self.cloud.get_all_instances(filters=filters)
+        # remove any cached nodes not in the current node list from cloud provider
         current_ids = [n.id for n in nodes]
         remove_nodes = [n for n in self._nodes if n.id not in current_ids]
         for node in remove_nodes:
             self._nodes.remove(node)
-        # update node cache with latest instance data from EC2
+        # update node cache with latest instance data from cloud provider
         existing_nodes = dict([(n.id, n) for n in self._nodes])
         log.debug('existing nodes: %s' % existing_nodes)
         for node in nodes:
@@ -789,7 +784,7 @@ class Cluster(object):
         nodes = self.nodes
         if not nodes:
             filters = {'instance.group-name': self._security_group}
-            terminated_nodes = self.ec2.get_all_instances(filters=filters)
+            terminated_nodes = self.cloud.get_all_instances(filters=filters)
             raise exception.NoClusterNodesFound(terminated_nodes)
         return nodes
 
@@ -888,7 +883,7 @@ class Cluster(object):
             filters['network-interface.group-id'] = group_id
         else:
             filters['launch.group-id'] = group_id
-        return self.ec2.get_all_spot_requests(filters=filters)
+        return self.cloud.get_all_spot_requests(filters=filters)
 
     def get_spot_requests_or_raise(self):
         spots = self.spot_requests
@@ -936,7 +931,7 @@ class Cluster(object):
         cluster_sg = self.cluster_group.name
         instance_type = instance_type or self.node_instance_type
         if placement_group or instance_type in static.PLACEMENT_GROUP_TYPES:
-            region = self.ec2.region.name
+            region = self.cloud.region.name
             if region not in static.PLACEMENT_GROUP_REGIONS:
                 cluster_regions = ', '.join(static.PLACEMENT_GROUP_REGIONS)
                 log.warn("Placement groups are only supported in the "
@@ -955,13 +950,14 @@ class Cluster(object):
                       launch_group=cluster_sg,
                       placement=zone or getattr(self.zone, 'name', None),
                       user_data=user_data,
-                      placement_group=placement_group)
+                      placement_group=placement_group,
+                      aliases=aliases)
         if self.subnet_id:
-            netif = self.ec2.get_network_spec(
+            netif = self.cloud.get_network_spec(
                 device_index=0, associate_public_ip_address=self.public_ips,
                 subnet_id=self.subnet_id, groups=[self.cluster_group.id])
             kwargs.update(
-                network_interfaces=self.ec2.get_network_collection(netif))
+                network_interfaces=self.cloud.get_network_collection(netif))
         else:
             kwargs.update(security_groups=[cluster_sg])
         resvs = []
@@ -971,9 +967,9 @@ class Cluster(object):
                 if not self.subnet_id:
                     kwargs['security_group_ids'] = [security_group_id]
                 kwargs['user_data'] = self._get_cluster_userdata([alias])
-                resvs.extend(self.ec2.request_instances(image_id, **kwargs))
+                resvs.extend(self.cloud.request_instances(image_id, **kwargs))
         else:
-            resvs.append(self.ec2.request_instances(image_id, **kwargs))
+            resvs.append(self.cloud.request_instances(image_id, **kwargs))
         for resv in resvs:
             log.info(str(resv), extra=dict(__raw__=True))
         return resvs
@@ -1042,9 +1038,9 @@ class Cluster(object):
                                      placement_group=placement_group,
                                      spot_bid=spot_bid)
             if spot_bid or self.spot_bid:
-                self.ec2.wait_for_propagation(spot_requests=resp)
+                self.cloud.wait_for_propagation(spot_requests=resp)
             else:
-                self.ec2.wait_for_propagation(instances=resp[0].instances)
+                self.cloud.wait_for_propagation(instances=resp[0].instances)
         self.wait_for_cluster(msg="Waiting for node(s) to come up...")
         log.debug("Adding node(s): %s" % aliases)
         for alias in aliases:
@@ -1161,7 +1157,7 @@ class Cluster(object):
 
     def create_cluster(self):
         """
-        Launches all EC2 instances based on this cluster's settings.
+        Launches all cloud provider instances based on this cluster's settings.
         """
         log.info("Launching a %d-node %s" % (self.cluster_size, ' '.join(
             ['VPC' if self.subnet_id else '', 'cluster...']).strip()))
@@ -1207,7 +1203,7 @@ class Cluster(object):
                                      instance_type=itype, zone=zone,
                                      force_flat=True)
             insts.extend(resv[0].instances)
-        self.ec2.wait_for_propagation(instances=insts)
+        self.cloud.wait_for_propagation(instances=insts)
 
     def _create_spot_cluster(self):
         """
@@ -1244,7 +1240,7 @@ class Cluster(object):
             spot_req = self.create_node(alias, image_id=nimage,
                                         instance_type=ntype, zone=zone)
             spot_reqs.append(spot_req)
-        self.ec2.wait_for_propagation(instances=insts, spot_requests=spot_reqs)
+        self.cloud.wait_for_propagation(instances=insts, spot_requests=spot_reqs)
 
     def is_spot_cluster(self):
         """
@@ -1398,7 +1394,7 @@ class Cluster(object):
                     time.sleep(self.refresh_interval)
                     spots = self.get_spot_requests_or_raise()
             pbar.reset()
-        self.ec2.wait_for_propagation(
+        self.cloud.wait_for_propagation(
             instances=[s.instance_id for s in spots])
 
     def wait_for_running_instances(self, nodes=None,
@@ -1477,7 +1473,7 @@ class Cluster(object):
         states = filter(lambda x: x != 'terminated', static.INSTANCE_STATES)
         filters = {'instance.group-name': self._security_group,
                    'instance-state-name': states}
-        insts = self.ec2.get_all_instances(filters=filters)
+        insts = self.cloud.get_all_instances(filters=filters)
         return len(insts) == 0
 
     def attach_volumes_to_master(self):
@@ -1489,7 +1485,7 @@ class Cluster(object):
             volume = self.volumes.get(vol)
             device = volume.get('device')
             vol_id = volume.get('volume_id')
-            vol = self.ec2.get_volume(vol_id)
+            vol = self.cloud.get_volume(vol_id)
             if vol.attach_data.instance_id == self.master_node.id:
                 log.info("Volume %s already attached to master...skipping" %
                          vol.id)
@@ -1504,7 +1500,7 @@ class Cluster(object):
             log.debug("resp = %s" % resp)
             wait_for_volumes.append(vol)
         for vol in wait_for_volumes:
-            self.ec2.wait_for_volume(vol, state='attached')
+            self.cloud.wait_for_volume(vol, state='attached')
 
     def detach_volumes(self):
         """
@@ -1594,14 +1590,14 @@ class Cluster(object):
                 time.sleep(5)
         finally:
             s.stop()
-        region = self.ec2.region.name
+        region = self.cloud.region.name
         if region in static.PLACEMENT_GROUP_REGIONS:
-            pg = self.ec2.get_placement_group_or_none(self._security_group)
+            pg = self.cloud.get_placement_group_or_none(self._security_group)
             if pg:
-                self.ec2.delete_group(pg)
-        sg = self.ec2.get_group_or_none(self._security_group)
+                self.cloud.delete_group(pg)
+        sg = self.cloud.get_group_or_none(self._security_group)
         if sg:
-            self.ec2.delete_group(sg)
+            self.cloud.delete_group(sg)
 
     def start(self, create=True, create_only=False, validate=True,
               validate_only=False, validate_running=False):
@@ -1909,7 +1905,7 @@ class ClusterValidator(validators.Validator):
         cluster = self.cluster
         master_image_id = cluster.master_image_id
         node_image_id = cluster.node_image_id
-        conn = cluster.ec2
+        conn = cluster.cloud
         image = conn.get_image_or_none(node_image_id)
         if not image or image.id != node_image_id:
             raise exception.ClusterValidationError(
@@ -1947,7 +1943,7 @@ class ClusterValidator(validators.Validator):
         instance_type. image_id_setting and instance_type_setting are the
         setting labels in the config file.
         """
-        image = self.cluster.ec2.get_image_or_none(image_id)
+        image = self.cluster.cloud.get_image_or_none(image_id)
         if not image:
             raise exception.ClusterValidationError('Image %s does not exist' %
                                                    image_id)
@@ -2144,7 +2140,7 @@ class ClusterValidator(validators.Validator):
         for vol in cluster.volumes:
             v = cluster.volumes.get(vol)
             vol_id = v.get('volume_id')
-            vol = cluster.ec2.get_volume(vol_id)
+            vol = cluster.cloud.get_volume(vol_id)
             if vol.status != 'available':
                 try:
                     if vol.attach_data.instance_id == cluster.master_node.id:
@@ -2156,7 +2152,7 @@ class ClusterValidator(validators.Validator):
                     (vol_id, vol.status))
 
     def validate_credentials(self):
-        if not self.cluster.ec2.is_valid_conn():
+        if not self.cluster.cloud.is_valid_conn():
             raise exception.ClusterValidationError(
                 'Invalid AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY combination.')
         return True
@@ -2175,11 +2171,11 @@ class ClusterValidator(validators.Validator):
             raise exception.ClusterValidationError(
                 "key_location '%s' is not a file" % key_location)
         keyname = cluster.keyname
-        keypair = cluster.ec2.get_keypair_or_none(keyname)
+        keypair = cluster.cloud.get_keypair_or_none(keyname)
         if not keypair:
             raise exception.ClusterValidationError(
                 "Keypair '%s' does not exist in region '%s'" %
-                (keyname, cluster.ec2.region.name))
+                (keyname, cluster.cloud.region.name))
         fingerprint = keypair.fingerprint
         try:
             open(key_location, 'r').close()
@@ -2191,6 +2187,9 @@ class ClusterValidator(validators.Validator):
             keyfingerprint = sshutils.get_private_rsa_fingerprint(key_location)
         elif len(fingerprint) == 47:
             keyfingerprint = sshutils.get_public_rsa_fingerprint(key_location)
+        elif len(fingerprint) == 40:
+            cert = sshutils.get_or_generate_signed_certificate_from_key(key_location)
+            keyfingerprint = sshutils.get_certificate_fingerprint(cert)
         else:
             raise exception.ClusterValidationError(
                 "Unrecognized fingerprint for %s: %s" % (keyname, fingerprint))
@@ -2243,13 +2242,13 @@ class ClusterValidator(validators.Validator):
                     "Not enough IP addresses available in %s (%d)" %
                     (self.cluster.subnet.id, ip_count))
             if self.cluster.public_ips:
-                gws = self.cluster.ec2.get_internet_gateways(filters={
+                gws = self.cluster.cloud.get_internet_gateways(filters={
                     'attachment.vpc-id': self.cluster.subnet.vpc_id})
                 if not gws:
                     raise exception.ClusterValidationError(
                         "No internet gateway attached to VPC: %s" %
                         self.cluster.subnet.vpc_id)
-                rtables = self.cluster.ec2.get_route_tables(filters={
+                rtables = self.cluster.cloud.get_route_tables(filters={
                     'association.subnet-id': self.cluster.subnet_id,
                     'route.destination-cidr-block': static.WORLD_CIDRIP,
                     'route.gateway-id': gws[0].id})
@@ -2266,9 +2265,22 @@ class ClusterValidator(validators.Validator):
 
 
 if __name__ == "__main__":
+    # from tethyscluster.config import TethysClusterConfig
+    #
+    # cfg = TethysClusterConfig().load()
+    # sc = cfg.get_cluster_template('smallcluster', 'mynewcluster')
+    # if sc.is_valid():
+    #     sc.start(create=True)
+
     from tethyscluster.config import TethysClusterConfig
+    from tethyscluster.cluster import ClusterManager
+    import azure
 
     cfg = TethysClusterConfig().load()
-    sc = cfg.get_cluster_template('smallcluster', 'mynewcluster')
-    if sc.is_valid():
-        sc.start(create=True)
+    cm = ClusterManager(cfg)
+    sc = cm.get_default_template_cluster('test')
+    try:
+        sc.start()
+    except azure.WindowsAzureConflictError, e:
+        print e
+        sc.start(create=False, validate_running=True)

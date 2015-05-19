@@ -77,7 +77,7 @@ def mp_userdata_from_files(files, compress=False, multipart_mime=None):
             # Encode the payload using Base64
             encoders.encode_base64(msg)
         # Set the filename parameter
-        fname = getattr(fp, 'name', "sc_%d" % i)
+        fname = getattr(fp, 'name', "tc_%d" % i)
         msg.add_header('Content-Disposition', 'attachment',
                        filename=os.path.basename(fname))
         outer.attach(msg)
@@ -117,7 +117,7 @@ for ti in tf:
 
 
 def userdata_script_from_files(fileobjs, tar_fname=None, tar_file=None):
-    tar_fname = tar_fname or 'sc_userdata.tar'
+    tar_fname = tar_fname or 'tc_userdata.tar'
     if tar_file:
         tf = tar_file
         tfd = tf.fileobj
@@ -245,8 +245,8 @@ def remove_from_userdata(userdata_string, filenames, decompress=True):
 if __name__ == '__main__':
     files = utils.strings_to_files(['#!/bin/bash\nhostname',
                                     '#!/bin/bash\ndate'],
-                                   fname_prefix='sc_userdata_file')
-    files += utils.string_to_file('#ignored\nblahblahblah', 'sc_metadata')
+                                   fname_prefix='tc_userdata_file')
+    files += utils.string_to_file('#ignored\nblahblahblah', 'tc_metadata')
     script = bundle_userdata_files(files, use_cloudinit=False)
     f = open('/tmp/tester.sh', 'w')
     f.write(script)

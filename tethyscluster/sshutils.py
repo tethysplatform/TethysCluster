@@ -30,6 +30,8 @@ import posixpath
 
 import scp
 import paramiko
+from OpenSSL import crypto
+# import cryptography
 # paramiko.util.log_to_file('~/.tethyscluster/logs/paramiko.log')
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
@@ -838,7 +840,6 @@ def get_dsa_key(key_location=None, key_file_obj=None, passphrase=None,
             "Invalid DSA private key file or missing passphrase: %s" %
             key_location)
 
-
 def get_public_key(key):
     return ' '.join([key.get_name(), key.get_base64()])
 
@@ -848,7 +849,7 @@ def generate_rsa_key():
 
 
 def get_private_rsa_fingerprint(key_location=None, key_file_obj=None,
-                                passphrase=None):
+                                passphrase=None, digest='sha1', format='DER', pkcs=8, with_colons=True):
     """
     Returns the fingerprint of a private RSA key as a 59-character string (40
     characters separated every 2 characters by a ':'). The fingerprint is
@@ -857,15 +858,17 @@ def get_private_rsa_fingerprint(key_location=None, key_file_obj=None,
     """
     k = get_rsa_key(key_location=key_location, key_file_obj=key_file_obj,
                     passphrase=passphrase, use_pycrypto=True)
-    sha1digest = hashlib.sha1(k.exportKey('DER', pkcs=8)).hexdigest()
-    fingerprint = insert_char_every_n_chars(sha1digest, ':', 2)
+    digest_func = getattr(hashlib, digest)
+    digest_result = digest_func(k.exportKey(format, pkcs=pkcs)).hexdigest()
+    # sha1digest = hashlib.sha1(k.exportKey('DER', pkcs=8)).hexdigest()
+    fingerprint = insert_char_every_n_chars(digest_result, ':', 2) if with_colons else digest_result
     key = key_location or key_file_obj
     log.debug("rsa private key fingerprint (%s): %s" % (key, fingerprint))
     return fingerprint
 
 
 def get_public_rsa_fingerprint(key_location=None, key_file_obj=None,
-                               passphrase=None):
+                               passphrase=None, digest='md5', format='DER', with_colons=True):
     """
     Returns the fingerprint of the public portion of an RSA key as a
     47-character string (32 characters separated every 2 characters by a ':').
@@ -875,12 +878,33 @@ def get_public_rsa_fingerprint(key_location=None, key_file_obj=None,
     privkey = get_rsa_key(key_location=key_location, key_file_obj=key_file_obj,
                           passphrase=passphrase, use_pycrypto=True)
     pubkey = privkey.publickey()
-    md5digest = hashlib.md5(pubkey.exportKey('DER')).hexdigest()
-    fingerprint = insert_char_every_n_chars(md5digest, ':', 2)
+    digest_func = getattr(hashlib, digest)
+    # md5digest = hashlib.md5(pubkey.exportKey(format)).hexdigest()
+    digest_result = digest_func(pubkey.exportKey(format)).hexdigest()
+    fingerprint = insert_char_every_n_chars(digest_result, ':', 2) if with_colons else digest_result
     key = key_location or key_file_obj
     log.debug("rsa public key fingerprint (%s): %s" % (key, fingerprint))
     return fingerprint
 
+def get_certificate_fingerprint(cert=None, cert_location=None, cert_file_obj=None,
+                                passphrase=None, digest='sha1', format=crypto.FILETYPE_ASN1, pkcs=8, with_colons=False):
+    """
+    Returns the fingerprint of a certificate as a 59-character string (40
+    characters separated every 2 characters by a ':'). The fingerprint is
+    computed using the SHA1 (hex) digest of the DER-encoded (pkcs8) certificate.
+    """
+    cert = cert or get_certificate(cert_location=cert_location, cert_file_obj=cert_file_obj)
+    fingerprint = cert.digest(digest)
+    if not with_colons:
+        fingerprint = fingerprint.replace(':', '')
+    # key = get_openssl_key(key_location, key_file_obj)
+    # cert.sign(key, 'sha1')
+    # digest_func = getattr(hashlib, digest)
+    # digest_result = digest_func(export_certificate(cert)).hexdigest()
+    # fingerprint = insert_char_every_n_chars(digest_result, ':', 2) if with_colons else digest_result
+    cert = cert_location or cert_file_obj
+    log.debug("certificate fingerprint (%s): %s" % (cert, fingerprint))
+    return fingerprint
 
 def test_create_keypair_fingerprint(keypair=None):
     """
@@ -912,3 +936,124 @@ def test_import_keypair_fingerprint(keypair):
     print 'local fingerprint: %s' % localfprint
     print '  ec2 fingerprint: %s' % ec2fprint
     assert localfprint == ec2fprint
+
+
+def _get_crypto_format(format):
+    if format.upper() == 'PEM':
+        return crypto.FILETYPE_PEM
+    elif format.upper() == 'DER':
+        return crypto.FILETYPE_ASN1
+    elif format.upper() == 'TEXT':
+        return crypto.FILETYPE_TEXT
+    else:
+        raise Exception('Unrecognized format: %s' % (format,))
+
+def export_certificate(certificate, format='PEM'):
+    crypto_format = _get_crypto_format(format)
+    cert = crypto.dump_certificate(crypto_format, certificate)
+    return cert
+
+def export_privatekey(key, passphrase=None, format='PEM'):
+    crypto_format = _get_crypto_format(format)
+    private_key = crypto.dump_privatekey(crypto_format, key)
+    return private_key
+
+def export_publickey(key, passphrase=None, format='PEM'):
+    private_key = export_privatekey(key, passphrase, format)
+    privkey = RSA.importKey(private_key, passphrase=passphrase)
+    pubkey = privkey.publickey()
+    return pubkey.exportKey(format)
+
+def write_key_certificate_to_file(certificate, key, passphrase=None, out_key_location=None,
+                                  out_key_file_obj=None, format='PEM'):
+    key_fobj = out_key_file_obj or open(out_key_location, 'w')
+    try:
+        pkey = export_privatekey(key, passphrase, format)
+        cert = export_certificate(certificate, format)
+        key_fobj.write(pkey)
+        key_fobj.write(cert)
+        key_fobj.close()
+    except Exception, e:
+        raise e
+
+def generate_openssl_key():
+    pkey = crypto.PKey()
+    pkey.generate_key(crypto.TYPE_RSA, 2048)
+    return pkey
+
+def generate_certificate(key=None, key_location=None, key_file_obj=None, country='US', state='Utah', locality='Provo',
+                         organization='TethysCluster', organizaiton_unit='1', common_name=None):
+    """
+        Find attribute. An X509Name object has the following attributes:
+        countryName (alias C), stateOrProvince (alias ST), locality (alias L),
+        organization (alias O), organizationalUnit (alias OU), commonName (alias
+        CN) and more...
+    """
+    hostname = socket.gethostname()
+    host_ip = socket.gethostbyname(socket.gethostname())
+
+    md5_hash = hashlib.md5()
+    md5_hash.update(hostname)
+    serial = int(md5_hash.hexdigest(), 36)
+
+    pkey = key or get_openssl_key(key_location=key_location, key_file_obj=key_file_obj)
+
+    cert = crypto.X509()
+    cert.get_subject().C = country
+    cert.get_subject().ST = state
+    cert.get_subject().L = locality
+    cert.get_subject().O = organization
+    cert.get_subject().OU = organizaiton_unit
+    cert.get_subject().CN = common_name or hostname #Common Name
+    cert.set_serial_number(serial) #should be incremented every time it's renewed
+    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notAfter(10*365*24*60*60)
+    cert.set_issuer(cert.get_subject())
+    cert.set_pubkey(pkey)
+    # cert.sign(pkey, 'sha1')
+
+    return cert
+
+def get_openssl_key(key_location=None, key_file_obj=None, passphrase=None):
+    key_fobj = key_file_obj or open(key_location)
+    try:
+        crypto_format = _get_crypto_format('PEM')
+        key = crypto.load_privatekey(crypto_format, key_fobj.read())
+        return key
+    except crypto.Error, e:
+        raise e
+
+def get_certificate(cert_location=None, cert_file_obj=None, format='PEM'):
+
+    key_fobj = cert_file_obj or open(cert_location)
+    try:
+        crypto_format = _get_crypto_format(format)
+        x509 = crypto.load_certificate(crypto_format, key_fobj.read())
+        return x509
+    except crypto.Error, e:
+        raise e
+
+def get_or_generate_signed_certificate_from_key(key_location=None, key_file_obj=None):
+    key = get_openssl_key(key_location=key_location, key_file_obj=key_file_obj)
+    try:
+        cert = get_certificate(cert_location=key_location, cert_file_obj=key_file_obj)
+    except:
+        cert = generate_certificate(key)
+
+    cert.sign(key, 'sha1')
+    return cert
+
+def get_64base_encoded_certificate(certificate=None, certificate_location=None, cert_file_obj=None):
+    import base64
+    cert = certificate or get_certificate(certificate_location=None, cert_file_obj=None)
+    certificate = export_certificate(cert, 'DER')
+    encoded_certificate = base64.b64encode(certificate)
+    return encoded_certificate
+
+
+if __name__ == '__main__':
+    key_location = '/Users/sdc50/.tethyscluster/tethyscert.pem'
+    cert = generate_certificate(key_location=key_location)
+    certificate = export_certificate(cert, 'PEM')
+    with open(key_location.replace('pem','crt'), 'w') as f:
+        f.write(certificate)

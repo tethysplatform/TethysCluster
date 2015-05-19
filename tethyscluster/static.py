@@ -51,7 +51,7 @@ def __makedirs(path, exit_on_failure=False):
         sys.exit(1)
 
 
-def create_sc_config_dirs():
+def create_tc_config_dirs():
     __makedirs(TETHYSCLUSTER_CFG_DIR, exit_on_failure=True)
     __makedirs(TETHYSCLUSTER_PLUGIN_DIR)
     __makedirs(TETHYSCLUSTER_LOG_DIR)
@@ -101,9 +101,9 @@ USER_TAG = SECURITY_GROUP_PREFIX + 'user'
 MAX_TAG_LEN = 255
 
 # Internal TethysCluster userdata filenames
-UD_PLUGINS_FNAME = "_sc_plugins.txt"
-UD_VOLUMES_FNAME = "_sc_volumes.txt"
-UD_ALIASES_FNAME = "_sc_aliases.txt"
+UD_PLUGINS_FNAME = "_tc_plugins.txt"
+UD_VOLUMES_FNAME = "_tc_volumes.txt"
+UD_ALIASES_FNAME = "_tc_aliases.txt"
 
 INSTANCE_METADATA_URI = "http://169.254.169.254/latest"
 INSTANCE_STATES = ['pending', 'running', 'shutting-down',
@@ -226,7 +226,7 @@ EBS_ONLY_TYPES = T1_INSTANCE_TYPES + T2_INSTANCE_TYPES
 # migrating folks away from this type in favor of cc2.8xlarge but the type
 # still works for some older accounts.
 PLACEMENT_GROUP_TYPES = (M3_COMPUTE_TYPES + HVM_ONLY_TYPES + HI_IO_TYPES +
-                         HI_STORAGE_TYPES)
+                         HI_STORAGE_TYPES + AZURE_INSTANCE_TYPES.keys())
 # T2 instances are HVM_ONLY_TYPES however they're not compatible with placement
 # groups so remove them from the list
 for itype in T2_INSTANCE_TYPES:
@@ -237,6 +237,17 @@ for itype in T2_INSTANCE_TYPES:
 PLACEMENT_GROUP_REGIONS = ['us-east-1', 'us-west-2', 'eu-west-1',
                            'ap-northeast-1', 'ap-southeast-1',
                            'ap-southeast-2']
+
+AZURE_REGIONS = ['West US', 'Central US', 'East US', 'East US 2',
+                 'US Gov Iowa', 'US Gov Virginia', 'North Central US',
+                 'South Central US', 'West US', 'North Europe',
+                 'West Europe', 'East Asia', 'Southeast Asia',
+                 'Japan East', 'Japan West', 'Brazil South',
+                 'Australia East', 'Australia Southeast']
+
+PLACEMENT_GROUP_REGIONS.extend(AZURE_REGIONS)
+
+
 
 PROTOCOLS = ['tcp', 'udp', 'icmp']
 

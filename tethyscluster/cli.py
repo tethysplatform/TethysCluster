@@ -325,7 +325,7 @@ def warn_debug_file_moved():
 
 def main():
     try:
-        static.create_sc_config_dirs()
+        static.create_tc_config_dirs()
         logger.configure_sc_logging()
         warn_debug_file_moved()
         TethysClusterCLI().main()

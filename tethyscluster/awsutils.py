@@ -471,7 +471,7 @@ class EasyEC2(EasyAWS):
                           availability_zone_group=None, placement=None,
                           user_data=None, placement_group=None,
                           block_device_map=None, subnet_id=None,
-                          network_interfaces=None):
+                          network_interfaces=None, **kwargs):
         """
         Convenience method for running spot or flat-rate instances
         """
@@ -496,7 +496,7 @@ class EasyEC2(EasyAWS):
                               dev)
                     bdmap.pop(dev)
             if img.root_device_name in img.block_device_mapping:
-                log.debug("Forcing delete_on_termination for AMI: %s" % img.id)
+                log.debug("Forcing delete_on_termination for AMI: %s" % (img.id,))
                 root = img.block_device_mapping[img.root_device_name]
                 # specifying the AMI's snapshot in the custom block device
                 # mapping when you dont own the AMI causes an error on launch
@@ -938,9 +938,9 @@ class EasyEC2(EasyAWS):
     def remove_image(self, image_name, pretend=True, keep_image_data=True):
         img = self.get_image(image_name)
         if pretend:
-            log.info('Pretending to deregister AMI: %s' % img.id)
+            log.info('Pretending to deregister AMI: %s' % (img.id,))
         else:
-            log.info('Deregistering AMI: %s' % img.id)
+            log.info('Deregistering AMI: %s' % (img.id,))
             img.deregister()
         if img.root_device_type == "instance-store" and not keep_image_data:
             self.remove_image_files(img, pretend=pretend)
@@ -1109,7 +1109,7 @@ class EasyEC2(EasyAWS):
             image = self.get_image(image)
         if image.root_device_type == 'ebs':
             raise exception.AWSError(
-                "Image %s is an EBS image. No image files on S3." % image.id)
+                "Image %s is an EBS image. No image files on S3." % (image.id,))
         bucket = self.get_image_bucket(image)
         bname = re.escape(bucket.name)
         prefix = re.sub('^%s\/' % bname, '', image.location)
@@ -1222,7 +1222,7 @@ class EasyEC2(EasyAWS):
                 self.wait_for_snapshot(self.get_snapshot(root.snapshot_id))
             else:
                 log.warn("The root device snapshot id is not yet available")
-        s = utils.get_spinner("Waiting for '%s' to become available" % ami.id)
+        s = utils.get_spinner("Waiting for '%s' to become available" % (ami.id,))
         try:
             while ami.state != 'available':
                 ami.update()
@@ -1391,8 +1391,8 @@ class EasyEC2(EasyAWS):
 
     def wait_for_snapshot(self, snapshot, refresh_interval=30):
         snap = snapshot
-        log.info("Waiting for snapshot to complete: %s" % snap.id)
-        widgets = ['%s: ' % snap.id, '',
+        log.info("Waiting for snapshot to complete: %s" % (snap.id,))
+        widgets = ['%s: ' % (snap.id,), '',
                    progressbar.Bar(marker=progressbar.RotatingMarker()),
                    '', progressbar.Percentage(), ' ', progressbar.ETA()]
         pbar = progressbar.ProgressBar(widgets=widgets, maxval=100).start()
@@ -1411,7 +1411,7 @@ class EasyEC2(EasyAWS):
 
     def create_snapshot(self, vol, description=None, wait_for_snapshot=False,
                         refresh_interval=30):
-        log.info("Creating snapshot of volume: %s" % vol.id)
+        log.info("Creating snapshot of volume: %s" % (vol.id,))
         snap = vol.create_snapshot(description)
         if wait_for_snapshot:
             self.wait_for_snapshot(snap, refresh_interval)
@@ -1481,7 +1481,7 @@ class EasyEC2(EasyAWS):
         vols.sort(key=lambda x: x.create_time)
         if vols:
             for vol in vols:
-                print "volume_id: %s" % vol.id
+                print "volume_id: %s" % (vol.id,)
                 print "size: %sGB" % vol.size
                 print "status: %s" % vol.status
                 if vol.attachment_state():

@@ -151,7 +151,7 @@ def configure_sc_logging(use_syslog=False):
     """
     log.setLevel(logging.DEBUG)
     formatter = logging.Formatter(DEBUG_FORMAT_PID)
-    static.create_sc_config_dirs()
+    static.create_tc_config_dirs()
     rfh = logging.handlers.RotatingFileHandler(static.DEBUG_FILE,
                                                maxBytes=1048576,
                                                backupCount=2)
@@ -175,7 +175,7 @@ def configure_paramiko_logging():
     """
     l = logging.getLogger("paramiko")
     l.setLevel(logging.DEBUG)
-    static.create_sc_config_dirs()
+    static.create_tc_config_dirs()
     lh = logging.handlers.RotatingFileHandler(static.SSH_DEBUG_FILE,
                                               maxBytes=1048576,
                                               backupCount=2)
@@ -194,7 +194,7 @@ def configure_boto_logging():
     """
     l = logging.getLogger("boto")
     l.setLevel(logging.DEBUG)
-    static.create_sc_config_dirs()
+    static.create_tc_config_dirs()
     lh = logging.handlers.RotatingFileHandler(static.AWS_DEBUG_FILE,
                                               maxBytes=1048576,
                                               backupCount=2)

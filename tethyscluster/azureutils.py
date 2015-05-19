@@ -43,6 +43,7 @@ from tethyscluster.utils import print_timing
 from tethyscluster.logger import log
 
 
+
 class EasyAzure(object):
 
     def __init__(self, subscription_id, certificate_path,
@@ -227,11 +228,10 @@ class EasySMS(EasyAzure):
         or InvalidPlacementGroup.InUse error it will keep retrying until it's
         successful. Waits 5 seconds between each retry.
         """
-        label = 'placement'
         if isinstance(group, SecurityGroup):
             label = 'security'
-        else:
-            group = SecurityGroup(group, self) #TODO create PlacementGroup class
+        elif isinstance(group, PlacementGroup):
+            label = 'placement'
         s = utils.get_spinner("Removing %s group: %s" % (label, group.name))
         try:
             for i in range(max_retries):
@@ -287,9 +287,10 @@ class EasySMS(EasyAzure):
         #     sg.authorize(src_group=sg, ip_protocol='udp', from_port=1,
         #                  to_port=65535)
         # return sg
-        sg = self.get_or_create_placement_group(name)
-        if not sg:
+        pg = self.get_or_create_placement_group(name)
+        if not pg:
             raise exception.PlacementGroupDoesNotExist(name)
+        sg = SecurityGroup(pg, self)
         return sg
 
     def get_all_security_groups(self, groupnames=[]):
@@ -394,8 +395,8 @@ class EasySMS(EasyAzure):
                 location=self.region.name)
 
             service = self.conn.get_hosted_service_properties(name)
-
-            return service
+            pg = PlacementGroup(service, self)
+            return pg
         else:
             raise azure.WindowsAzureError('Hosted Service already exists')
 
@@ -422,8 +423,8 @@ class EasySMS(EasyAzure):
             srvs = fnmatch.filter(hosted_services, group_name)
             services.extend([self.conn.get_hosted_service_properties(service_name) for service_name in srvs])
         #'''
-
-        return services
+        pgs = [PlacementGroup(service, self) for service in services]
+        return pgs
 
     def get_placement_group(self, groupname=None):
         try:
@@ -470,25 +471,32 @@ class EasySMS(EasyAzure):
                           availability_zone_group=None, placement=None,
                           user_data=None, placement_group=None,
                           block_device_map=None, subnet_id=None,
-                          network_interfaces=None):
+                          network_interfaces=None, **kwargs):
         """
         Convenience method for running spot or flat-rate instances
         """
         #I just deleted a bunch of code that handled block device maps. I'm not sure how this applies in Azure
 
-        kwargs = dict(min_count=min_count,
-                      max_count=max_count,
-                      security_groups=security_groups,
+        # kwargs = dict(min_count=min_count,
+        #               max_count=max_count,
+        #               security_groups=security_groups,
+        #               instance_type=instance_type,
+        #               key_name=key_name,
+        #               subnet_id=subnet_id,
+        #               placement=placement,
+        #               placement_group=placement_group,
+        #               user_data=user_data,
+        #               block_device_map=block_device_map,
+        #               network_interfaces=network_interfaces)
+
+        kwargs = dict(aliases=kwargs['aliases'], #TODO can I get the aliases from binary user_data?
+                      placement_group=self._azurify(placement_group),
                       instance_type=instance_type,
                       key_name=key_name,
-                      subnet_id=subnet_id,
-                      placement=placement,
-                      placement_group=placement_group,
-                      user_data=user_data,
-                      block_device_map=block_device_map,
-                      network_interfaces=network_interfaces)
+                      user_data=user_data)
 
-        return self.run_instances(**kwargs)
+        instances = self.run_instances(image_id, **kwargs)
+        return Reservation(instances)
 
     def request_spot_instances(self, price, image_id, instance_type='m1.small',
                                count=1, launch_group=None, key_name=None,
@@ -560,6 +568,52 @@ class EasySMS(EasyAzure):
     def run_instances(self, image_id, aliases=None, placement_group=None, instance_type='Small', key_name=None,
                       security_groups=None, user_data=None, **kwargs):
 
+        def add_key_to_service(service_name, key_name):
+            from tethyscluster import config
+            SERVICE_CERT_FORMAT = 'pfx'
+            cfg = config.get_config()
+            key_location = cfg.get_key(key_name).get('key_location')
+            cert = sshutils.get_or_generate_signed_certificate_from_key(key_location)
+            service_cert_file_data = sshutils.get_64base_encoded_certificate(cert)
+            fingerprint = sshutils.get_certificate_fingerprint(cert)
+
+            result = self.conn.add_service_certificate(service_name,
+                                 service_cert_file_data, SERVICE_CERT_FORMAT, '')
+
+            self.conn.wait_for_operation_status(result.request_id,
+                                                timeout=300,
+                                                progress_callback=lambda x: sys.stdout.write(''),
+                                                success_callback=lambda x: sys.stdout.write(''))
+
+            properties = self.conn.get_hosted_service_properties(service_name, True).hosted_service_properties
+            properties.extended_properties['key_name'] = key_name
+            self.conn.update_hosted_service(service_name, properties.label, properties.description,
+                                                   properties.extended_properties)
+            return fingerprint, key_location
+
+        def get_endpoints(rdp_port, ssh_port):
+            endpoint_config = ConfigurationSet()
+            endpoint_config.configuration_set_type = 'NetworkConfiguration'
+
+            endpoint1 = ConfigurationSetInputEndpoint(name='rdp',
+                                                      protocol='tcp',
+                                                      port=rdp_port,
+                                                      local_port='3389',
+                                                      load_balanced_endpoint_set_name=None,
+                                                      enable_direct_server_return=False)
+            endpoint2 = ConfigurationSetInputEndpoint(name='ssh',
+                                                      protocol='tcp',
+                                                      port=ssh_port,
+                                                      local_port='22',
+                                                      load_balanced_endpoint_set_name=None,
+                                                      enable_direct_server_return=False)
+
+            #endpoints must be specified as elements in a list
+
+            endpoint_config.input_endpoints.input_endpoints.append(endpoint1)
+            endpoint_config.input_endpoints.input_endpoints.append(endpoint2)
+            return endpoint_config
+
         user_name='tethysadmin'
         password = '@tc-tethysadmin1'
 
@@ -577,63 +631,48 @@ class EasySMS(EasyAzure):
             system_config.win_rm = None #I don't know what this does or why it is needed
         elif os == 'Linux':
             hostname = 'host_name'
+            password = None
             system_config = LinuxConfigurationSet(user_name=user_name,
                                                   user_password=password,
                                                   disable_ssh_password_authentication=False,
                                                   custom_data=user_data)
-            # ssh = SSH()
-            # fingerprint = None
-            # path = None
-            # public_key = PublicKey(fingerprint, path)
-            # key_pairs = KeyPair(fingerprint, path)
-            # ssh.public_keys.public_keys.append(public_key)
-            # ssh.key_pairs.key_pairs.append(key_pairs)
-            # system_config.ssh = ssh
+            if key_name:
+                fingerprint, key_location = add_key_to_service(placement_group, key_name)
+
+                thumbprint = fingerprint.replace(':', '')
+                ssh = SSH()
+                public_key = PublicKey(thumbprint, key_location)
+                key_pairs = KeyPair(thumbprint, key_location)
+                ssh.public_keys.public_keys.append(public_key)
+                ssh.key_pairs.key_pairs.append(key_pairs)
+                system_config.ssh = ssh
         else:
             raise Exception('%s is not a supported os' % (os,))
 
-        def get_endpoints(rdp_port, ssh_port):
-            endpoint_config = ConfigurationSet()
-            endpoint_config.configuration_set_type = 'NetworkConfiguration'
 
-            endpoint1 = ConfigurationSetInputEndpoint(name = 'rdp',
-                                                      protocol = 'tcp',
-                                                      port = rdp_port,
-                                                      local_port = '3389',
-                                                      load_balanced_endpoint_set_name = None,
-                                                      enable_direct_server_return = False)
-            endpoint2 = ConfigurationSetInputEndpoint(name = 'ssh',
-                                                      protocol = 'tcp',
-                                                      port = ssh_port,
-                                                      local_port = '22',
-                                                      load_balanced_endpoint_set_name = None,
-                                                      enable_direct_server_return = False)
+        from userdata import unbundle_userdata
+        user_data = unbundle_userdata(user_data)
 
-            #endpoints must be specified as elements in a list
-
-            endpoint_config.input_endpoints.input_endpoints.append(endpoint1)
-            endpoint_config.input_endpoints.input_endpoints.append(endpoint2)
-            return endpoint_config
-
+        aliases = user_data['_tc_aliases.txt'].split('\n')[-2:]
 
         for alias in aliases:
             # print alias
-            rdp_port = 3389
-            ssh_port = 22
+            ssh_port = static.DEFAULT_SSH_PORT
+            rdp_port = static.DEFAULT_RDP_PORT
             alias_parts = re.split('node', alias)
             if len(alias_parts) == 2:
                 index = alias_parts[1]
                 rdp_port = '33' + index
-                ssh_port = '22' + index
+                ssh_port = str(ssh_port) + index
             system_config.__dict__[hostname] = alias
             kwargs = dict(service_name=placement_group,
                           deployment_name=placement_group,
                           role_name=alias,
                           system_config=system_config,
                           os_virtual_hard_disk=None,
-                          network_config = get_endpoints(rdp_port, ssh_port),
+                          network_config=get_endpoints(rdp_port, ssh_port),
                           role_size=instance_type,
-                          vm_image_name = image_id,
+                          vm_image_name=image_id,
                           )
 
             try:
@@ -641,14 +680,18 @@ class EasySMS(EasyAzure):
             except WindowsAzureMissingResourceError as e:
                 deployment = None
             if not deployment:
-                 id = self.conn.create_virtual_machine_deployment(deployment_slot='production', label=alias,
-                                                                  **kwargs).request_id
+                 result = self.conn.create_virtual_machine_deployment(deployment_slot='production',
+                                                                      label=alias, **kwargs)
             else:
-                id = self.conn.add_role(**kwargs).request_id
-            self.conn.wait_for_operation_status(id, timeout=300, progress_callback=lambda x: sys.stdout.write(''),
-                                                success_callback=lambda  x: sys.stdout.write(''))
+                result = self.conn.add_role(**kwargs)
+            self.conn.wait_for_operation_status(result.request_id,
+                                                timeout=300,
+                                                progress_callback=lambda x: sys.stdout.write(''),
+                                                success_callback=lambda x: sys.stdout.write(''))
 
-        return self.get_all_instances(aliases)
+        ids = [(placement_group, placement_group, alias) for alias in aliases]
+        return self.get_all_instances(instance_ids=ids,
+                                      filters={'instance.group-name': self._unazurify(placement_group)})
 
     def create_image(self, instance_id, name, description=None,
                      no_reboot=False):
@@ -674,6 +717,9 @@ class EasySMS(EasyAzure):
         certs = self.conn.list_management_certificates().subscription_certificates
         for cert in certs:
             cert.fingerprint = cert.subscription_certificate_thumbprint
+
+        if 'key-name' in filters.keys():
+            certs = [cert for cert in certs if cert.fingerprint == filters['key-name']]
         return certs
 
     def get_keypair(self, keypair):
@@ -699,7 +745,29 @@ class EasySMS(EasyAzure):
         raise NotImplementedError()
 
     def get_instance_user_data(self, instance_id):
-        raise NotImplementedError()
+        try:
+            from tethyscluster import config
+            # attrs = self.conn.get_instance_attribute(instance_id, 'userData')
+            # user_data = attrs.get('userData', '') or ''
+            instance = self.get_instance(instance_id)
+            cfg = config.get_config()
+            key_location = cfg.get_key(instance.key_name).get('key_location')
+            ssh = sshutils.SSHClient(instance.ip_address,
+                                       username='root',
+                                       port = instance.ports['ssh'],
+                                       private_key=key_location)
+            user_data_file = ssh.remote_file('/var/lib/waagent/ovf-env.xml', 'r')
+            text = user_data_file.read()
+            match = re.search('<CustomData>(.*?)</CustomData>', text)
+            raw = match.group(1)
+            user_data = base64.b64decode(raw)
+            return user_data
+        except azure.WindowsAzureError as e:
+            # if e.error_code == "InvalidInstanceID.NotFound":
+            #     raise exception.InstanceDoesNotExist(instance_id)
+            raise e
+        except Exception, e:
+            raise e
 
     def get_securityids_from_names(self, groupnames):
         raise NotImplementedError()
@@ -711,17 +779,21 @@ class EasySMS(EasyAzure):
             hosted_services = self.list_all_hosted_services()
         instances = []
         for name in hosted_services:
-            service = self.conn.get_hosted_service_properties(name, True)
-            for deployment in service.deployments.deployments:
-                id = (name, deployment.name, )
-                insts = deployment.role_instance_list.role_instances
-                rols = deployment.role_list.roles
-                assert len(insts) == len(rols)
-                for i in range(0,len(insts)):
-                    role = rols[i]
-                    if role.role_type == 'PersistentVMRole':
-                        instance = Instance(service, deployment, insts[i], role, self)
-                        instances.append(instance)
+            try:
+                service = self.conn.get_hosted_service_properties(name, True)
+                for deployment in service.deployments.deployments:
+
+                    insts = deployment.role_instance_list.role_instances
+                    rols = deployment.role_list.roles
+                    assert len(insts) == len(rols)
+                    for i in range(0,len(insts)):
+                        role = rols[i]
+                        if role.role_type == 'PersistentVMRole':
+                            instance = Instance(service, deployment, insts[i], role, self)
+                            instances.append(instance)
+            except WindowsAzureMissingResourceError as e:
+                pass
+
 
         if instance_ids:
             instances = [instance for instance in instances if instance.id in instance_ids]
@@ -761,10 +833,11 @@ class EasySMS(EasyAzure):
             raise
 
     def get_all_spot_requests(self, spot_ids=[], filters=None):
-        return None
+        return []
 
     def list_all_spot_instances(self, show_closed=False):
-        return None
+        log.info("No spot instance requests found...")
+        return
 
     def show_instance(self, instance):
         raise NotImplementedError()
@@ -810,10 +883,10 @@ class EasySMS(EasyAzure):
         raise NotImplementedError()
 
     def get_zone(self, zone):
-        raise NotImplementedError()
+        return None
 
     def get_zone_or_none(self, zone):
-        raise NotImplementedError()
+        return None
 
     def create_s3_image(self, instance_id, key_location, aws_user_id,
                         ec2_cert, ec2_private_key, bucket, image_name="image",
@@ -837,6 +910,11 @@ class EasySMS(EasyAzure):
         images = []
         for image in all_images:
             if image.name == image_id:
+                image.id = image.name
+                image.state = 'available' #required for cluster validation. Are Azure images ever not available?
+                image.architecture = 'x86_64'
+                image.virtualization_type = None
+                image.root_device_type = None
                 images.append(image)
         # print time.time()-start
         return images
@@ -995,24 +1073,62 @@ class EasyAzureStorage(EasyAzure):
     def get_bucket_files(self, bucketname):
         raise NotImplementedError()
 
-class SecurityGroup(object):
-    def __init__(self, service, easy_sms ):
+
+class PlacementGroup(object):
+    def __init__(self, service, easy_sms):
         self.name = easy_sms._unazurify(service.service_name)
-        self.connection = easy_sms
-        self.tags = dict()
-        self.vpc_id = None
         self.id = service.service_name
+        self._properties = easy_sms.conn.get_hosted_service_properties(self.id, True).hosted_service_properties
+
+
+class SecurityGroup(object):
+    def __init__(self, pg, easy_sms):
+        self.name = pg.name
+        self.id = pg.id
+        self.connection = easy_sms
+        self.vpc_id = None
+        self._properties = pg._properties
+        self._service_tags = self._properties.extended_properties
+        self.tags = self._load_tags()
 
     def instances(self):
         return self.connection.get_all_instances(filters={'instance.group-name': self.name})
 
+    def add_tag(self, key, value):
+        self.tags[key] = value
+        self._update_service_tags(key, value)
+
+    def _update_service_tags(self, key, value):
+        k = key.replace('@tc-', 'tc_')
+        self._service_tags[k] = value
+        self.connection.conn.update_hosted_service(self.id, self._properties.label, self._properties.description,
+                                                   self._service_tags)
+
+    def _load_tags(self):
+        tags = dict()
+        for key,value in self._service_tags.iteritems():
+            k = key.replace('tc_', '@tc-')
+            tags[k] = value
+        return tags
+
+
+class Reservation(object):
+    def __init__(self, instances):
+        self.instances = instances
+
+    def __str__(self):
+        return self.instances.__str__()
+
 class Instance(object):
 
-    POWER_STATES = {'Starting':'pending', 'Started':'running' , 'Stopping':'stopping', 'Stopped':'stopped', 'Unknown':'terminated'}
+    POWER_STATES = {'Starting': 'pending', 'Started': 'running' , 'Stopping': 'stopping', 'Stopped': 'stopped',
+                    'Unknown': 'terminated'}
 
-    def __init__(self, service, deployment, role_instance, role, conn):
+    def __init__(self, service, deployment, role_instance, role, easy_sms):
         self.role_instance = role_instance
         self.role = role
+        self.service_properties = easy_sms.conn.get_hosted_service_properties(service.service_name,
+                                                                      True).hosted_service_properties
         self.ports = dict()
         for endpoint in role_instance.instance_endpoints:
             self.ports[endpoint.name] = int(endpoint.public_port)
@@ -1024,7 +1140,7 @@ class Instance(object):
         self.state_code = None
         self.previous_state = None
         self.previous_state_code = None
-        self.key_name = 'tethyscert'
+        self.key_name = None #TODO look at CertificateStore on Azure api
         self.instance_type = role.role_size
         self.launch_time = deployment.created_time
         self.image_id = role.os_virtual_hard_disk.source_image_name
@@ -1055,11 +1171,16 @@ class Instance(object):
         self.ebs_optimized = None
         self.instance_profile = None
 
-        self.connection = conn
+        self.connection = easy_sms
         self.dns_name = self.ip_address #for some reason ssh not working with: deployment.url
         self.tags = dict()
         self.add_tag('alias', role.role_name)
         self.add_tag('Name', role.role_name)
+        if 'key_name' in self.service_properties.extended_properties.keys():
+            self.key_name = self.service_properties.extended_properties['key_name']
+
+    def __repr__(self):
+        return '<Azure Instance: %s' % (self.id,)
 
     def add_tag(self, k, v):
         self.tags[k]=v
@@ -1080,7 +1201,7 @@ class Instance(object):
             max_tries -= 1
             if max_tries < 1:
                 raise
-            log.warn('Waiting for instance to be available...')
+            log.info('Waiting for instance to be available...')
             time.sleep(timeout)
             self._terminate_role(max_tries, timeout)
 
@@ -1115,7 +1236,7 @@ if __name__ == "__main__":
             args = ('Invalid Region')
             self.assertRaises(exception.RegionDoesNotExist, method, args)
 
-        '''
+        #'''
         def run_instance(self):
             '''
         def test_run_instances(self):
@@ -1134,7 +1255,7 @@ if __name__ == "__main__":
             service = self.easySMS.conn.get_hosted_service_properties(service_name, True)
 
             master_alias = 'master'
-            image_id = 'tc-linux12-0'
+            image_id = 'tc-linux12-2'
 
             # id = self.easySMS.run_instances(image_id, master_alias, service_name).request_id
             # print id
@@ -1149,6 +1270,11 @@ if __name__ == "__main__":
 
             pprint(service.hosted_service_properties.__dict__)
             print service.deployments.deployments
+
+        def test_vm_with_ssh(self):
+            image_id = 'tc-linux12-2'
+            pg = self.easySMS.get_or_create_placement_group('ssh_key-test')
+            self.easySMS.run_instances(image_id, ['master'], pg.service_name, key_name='tethyscert')
 
 
         def test_get_all_instances(self):

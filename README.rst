@@ -1,6 +1,6 @@
-===================
-TethysCluster v0.1.0
-===================
+=============
+TethysCluster
+=============
 :TethysCluster: Cloud Computing Toolkit for Diverse Clusters
 :Version: 0.1
 :Author: Scott Christensen

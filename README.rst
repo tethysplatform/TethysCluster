@@ -2,7 +2,7 @@
 TethysCluster
 =============
 :TethysCluster: Cloud Computing Toolkit for Diverse Clusters
-:Version: 0.1
+:Version: 0.1.0
 :Author: Scott Christensen
 :Team: CI-Water
 :Homepage: http://ci-water.org

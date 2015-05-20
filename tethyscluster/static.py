@@ -56,8 +56,15 @@ def create_tc_config_dirs():
     __makedirs(TETHYSCLUSTER_PLUGIN_DIR)
     __makedirs(TETHYSCLUSTER_LOG_DIR)
 
+def get_version():
+    import re
+    with open('README.rst','r') as f:
+        text = f.read()
+        version = re.search(':Version: ([\.?\d]*)',text).group(1)
+        return version
 
-VERSION = "0.1.0"
+
+VERSION = get_version()
 PID = os.getpid()
 TMP_DIR = tempfile.gettempdir()
 if os.path.exists("/tmp"):

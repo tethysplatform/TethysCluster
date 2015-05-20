@@ -20,6 +20,7 @@
 
 import os
 import sys
+import re
 
 if sys.version_info < (2, 6):
     error = "ERROR: TethysCluster requires Python 2.6+ ... exiting."
@@ -62,17 +63,17 @@ try:
             errno = pytest.main(self.test_args)
             sys.exit(errno)
 
+    def get_install_requirements():
+        with open('requirements.txt', 'r') as f:
+            text = f.read()
+            return re.search('#.*?\n(((?!#).*\n)*)', text).group(1).strip('\n').split('\n')
+
     console_scripts = ['tethyscluster = tethyscluster.cli:main']
     extra = dict(test_suite="tethyscluster.tests",
                  tests_require= ["pytest-cov", "pytest-pep8", "pytest-flakes",
                                  "pytest"],
                  cmdclass={"test": PyTest},
-                 install_requires=["paramiko>=1.15.2", "boto>=2.23.0",
-                                   "workerpool>=0.9.2", "Jinja2>=2.7",
-                                   "decorator>=3.4.0", "iptools>=0.6.1",
-                                   "optcomplete>=1.2-devel",
-                                   "pycrypto>=2.5", "scp>=0.7.1",
-                                   "iso8601>=0.1.8"],
+                 install_requires=get_install_requirements(),
                  include_package_data=True,
                  entry_points=dict(console_scripts=console_scripts),
                  zip_safe=False)

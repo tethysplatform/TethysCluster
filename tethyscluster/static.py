@@ -91,10 +91,14 @@ SSH_DEBUG_FILE = os.path.join(TETHYSCLUSTER_LOG_DIR, 'ssh-debug.log')
 AWS_DEBUG_FILE = os.path.join(TETHYSCLUSTER_LOG_DIR, 'aws-debug.log')
 CRASH_FILE = os.path.join(TETHYSCLUSTER_LOG_DIR, 'crash-report-%d.txt' % PID)
 
-# TethysCluster BASE AMIs (us-east-1)
+# StarCluster BASE AMIs (us-east-1)
 BASE_AMI_32 = "ami-9bf9c9f2"
 BASE_AMI_64 = "ami-3393a45a"
 BASE_AMI_HVM = "ami-6b211202"
+
+# TethysCluster BASE Azure Images
+BASE_IMAGE_64 = 'tc-linux12-2'
+
 
 SECURITY_GROUP_PREFIX = "@tc-"
 SECURITY_GROUP_TEMPLATE = SECURITY_GROUP_PREFIX + "%s"

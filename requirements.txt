@@ -9,6 +9,8 @@ pycrypto==2.6.1
 iptools==0.6.1
 optcomplete==1.2-devel
 iso8601==0.1.8
+pyOpenSSL==0.14
+azure==0.10.0
 # optional deps
 ipython==1.1.0 # needed for shell command
 # required for git-hooks and check.py

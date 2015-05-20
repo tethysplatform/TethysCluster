@@ -1,6 +1,8 @@
-# Copyright 2009-2014 Justin Riley
+# Copyright 2015 Scott Christensen
 #
-# This file is part of TethysCluster.
+# This file is part of TethysCluster
+#
+# TethysCluster is a modified version of StarCluster (Copyright 2009-2014 Justin Riley)
 #
 # TethysCluster is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -36,11 +38,21 @@ DEFAULT_TEMPLATE=smallcluster
 #INCLUDE=~/.tethyscluster/aws, ~/.tethyscluster/keys, ~/.tethyscluster/vols
 
 #############################################
+## Azure Credentials and Connection Settings ##
+#############################################
+[azure info]
+# This is the Azure credentials section (this section or the [aws info] section is required).
+# These settings apply to all Azure clusters
+# replace these with your Azure id and certificate
+SUBSCRIPTION_ID = #your_azure_subscription_id
+CERTIFICATE_PATH = #path_to_your_azure_certificate
+
+#############################################
 ## AWS Credentials and Connection Settings ##
 #############################################
 [aws info]
-# This is the AWS credentials section (required).
-# These settings apply to all clusters
+# This is the AWS credentials section (this section or the [azure info] section is required).
+# These settings apply to all AWS clusters
 # replace these with your AWS keys
 AWS_ACCESS_KEY_ID = #your_aws_access_key_id
 AWS_SECRET_ACCESS_KEY = #your_secret_access_key
@@ -73,6 +85,12 @@ KEY_LOCATION=~/.ssh/mykey.rsa
 # [key myotherkey]
 # KEY_LOCATION=~/.ssh/myotherkey.rsa
 
+# Azure keys should use the certificate fingerprint as the name
+# The certificate should also be uploaded through the Azure Management Portal
+# The fingerprint can be copied from the Azure Management Portal
+[key 00000AZURE0CERTIFICATE0FINGERPRINT000000]
+KEY_LOCATION=~/.ssh/AzureCertificate.pem
+
 ################################
 ## Defining Cluster Templates ##
 ################################
@@ -91,6 +109,7 @@ KEY_LOCATION=~/.ssh/mykey.rsa
 # on defining multiple templates.
 
 [cluster smallcluster]
+CLOUD_PROVIDER = AWS
 # change this to the name of one of the keypair sections defined above
 KEYNAME = mykey
 # number of ec2 instances to launch
@@ -111,8 +130,8 @@ CLUSTER_SHELL = bash
 # The base x86_64 TethysCluster AMI is %(x86_64_ami)s
 # The base HVM TethysCluster AMI is %(hvm_ami)s
 NODE_IMAGE_ID = %(x86_64_ami)s
-# instance type for all cluster nodes
-# (options: %(instance_types)s)
+# instance type for all AWS cluster nodes
+# (options: %(aws_instance_types)s)
 NODE_INSTANCE_TYPE = m1.small
 # Launch cluster in a VPC subnet (OPTIONAL)
 #SUBNET_ID=subnet-99999999
@@ -142,7 +161,7 @@ NODE_INSTANCE_TYPE = m1.small
 #VOLUMES = oceandata, biodata
 # list of plugins to load after TethysCluster's default setup routines (OPTIONAL)
 # see "Configuring TethysCluster Plugins" below on how to define plugin sections
-#PLUGINS = myplugin, myplugin2
+PLUGINS = condor
 # list of permissions (or firewall rules) to apply to the cluster's security
 # group (OPTIONAL).
 #PERMISSIONS = ssh, http
@@ -154,6 +173,31 @@ NODE_INSTANCE_TYPE = m1.small
 # cluster instances. Supports cloudinit. All scripts combined must be less than
 # 16KB
 #USERDATA_SCRIPTS = /path/to/script1, /path/to/script2
+
+[cluster azure_cluster]
+CLOUD_PROVIDER = Azure
+# change this to the name of one of the keypair sections defined above
+KEYNAME = 00000AZURE0CERTIFICATE0FINGERPRINT000000
+# number of VM role instances to launch
+CLUSTER_SIZE = 2
+# create the following user on the cluster
+CLUSTER_USER = tethysadmin
+# optionally specify shell (defaults to bash)
+# (options: %(shells)s)
+CLUSTER_SHELL = bash
+NODE_IMAGE_ID = %(x86_64_image)s
+# instance type for all Azure cluster nodes
+# (options: %(azure_instance_types)s)
+NODE_INSTANCE_TYPE = Small
+# Uncomment to specify a different instance type for the master node (OPTIONAL)
+# (defaults to NODE_INSTANCE_TYPE if not specified)
+#MASTER_INSTANCE_TYPE = Small
+# Uncomment to specify a separate AMI to use for the master node. (OPTIONAL)
+# (defaults to NODE_IMAGE_ID if not specified)
+#MASTER_IMAGE_ID = %(x86_64_image)s (OPTIONAL)
+# list of plugins to load after TethysCluster's default setup routines (OPTIONAL)
+# see "Configuring TethysCluster Plugins" below on how to define plugin sections
+PLUGINS = condor
 
 ###########################################
 ## Defining Additional Cluster Templates ##
@@ -291,8 +335,8 @@ NODE_INSTANCE_TYPE = m1.small
 # DOWNLOAD_KEYS = True
 #
 # Use this plugin to configure the Condor queueing system
-# [plugin condor]
-# SETUP_CLASS = tethyscluster.plugins.condor.CondorPlugin
+[plugin condor]
+SETUP_CLASS = tethyscluster.plugins.condor.CondorPlugin
 #
 # The SGE plugin is enabled by default and not strictly required. Only use this
 # if you want to tweak advanced settings in which case you should also set
@@ -351,8 +395,10 @@ NODE_INSTANCE_TYPE = m1.small
 """ % {
     'x86_ami': static.BASE_AMI_32,
     'x86_64_ami': static.BASE_AMI_64,
+    'x86_64_image': static.BASE_IMAGE_64,
     'hvm_ami': static.BASE_AMI_HVM,
-    'instance_types': ', '.join(static.INSTANCE_TYPES.keys()),
+    'aws_instance_types': ', '.join(static.AWS_INSTANCE_TYPES.keys()),
+    'azure_instance_types': ', '.join(static.AZURE_INSTANCE_TYPES.keys()),
     'shells': ', '.join(static.AVAILABLE_SHELLS.keys()),
 }
 

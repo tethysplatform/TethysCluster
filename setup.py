@@ -124,12 +124,9 @@ except ImportError:
 
     extra = {'scripts': ['bin/tethyscluster']}
 
-VERSION = 0.9999
-basedir = os.path.dirname(__file__)
-static = os.path.join(basedir, 'tethyscluster', 'static.py')
-execfile(static)  # pull VERSION from static.py
-
 README = open('README.rst').read()
+VERSION = 0.9999
+VERSION = re.search(':Version: ([\.?\d]*)',README).group(1)
 
 setup(
     name='TethysCluster',

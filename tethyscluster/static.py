@@ -58,7 +58,9 @@ def create_tc_config_dirs():
 
 def get_version():
     import re
-    with open('README.rst','r') as f:
+    basepath = os.path.dirname(__file__)
+    filepath = os.path.join(basepath, '..', 'README.rst')
+    with open(filepath,'r') as f:
         text = f.read()
         version = re.search(':Version: ([\.?\d]*)',text).group(1)
         return version

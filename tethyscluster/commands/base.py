@@ -109,6 +109,13 @@ class CmdBase(completion.CmdComplete):
         return self._cloud
 
     @property
+    def ec2(self):
+        """
+        For backward compatibility.
+        """
+        return self.cloud
+
+    @property
     def cluster_manager(self):
         """
         Returns ClusterManager object configured with self.cfg and self.cloud

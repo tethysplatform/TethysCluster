@@ -139,7 +139,9 @@ except ImportError:
 
 README = open(os.path.join(basedir, 'README.rst')).read()
 VERSION = 0.9999
-VERSION = re.search(':Version: ([\.?\d]*)',README).group(1)
+basedir = os.path.dirname(__file__)
+static = os.path.join(basedir, 'tethyscluster', 'static.py')
+execfile(static)  # pull VERSION from static.py
 
 setup(
     name='TethysCluster',

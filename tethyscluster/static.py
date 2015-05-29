@@ -57,7 +57,7 @@ def create_tc_config_dirs():
     __makedirs(TETHYSCLUSTER_LOG_DIR)
 
 
-VERSION = '0.1.4'
+VERSION = '0.1.5'
 PID = os.getpid()
 TMP_DIR = tempfile.gettempdir()
 if os.path.exists("/tmp"):

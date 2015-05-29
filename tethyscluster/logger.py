@@ -136,7 +136,7 @@ log = get_tethyscluster_logger()
 console = ConsoleLogger()
 
 
-def configure_sc_logging(use_syslog=False):
+def configure_tc_logging(use_syslog=False):
     """
     Configure logging for TethysCluster *application* code
 
@@ -159,7 +159,7 @@ def configure_sc_logging(use_syslog=False):
     rfh.setFormatter(formatter)
     log.addHandler(rfh)
     console.setLevel(logging.INFO)
-    log.addHandler(console)
+    # log.addHandler(console)#TODO
     syslog_device = '/dev/log'
     if use_syslog and os.path.exists(syslog_device):
         log.debug("Logging to %s" % syslog_device)

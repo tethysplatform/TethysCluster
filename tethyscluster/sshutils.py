@@ -31,8 +31,6 @@ import posixpath
 import scp
 import paramiko
 from OpenSSL import crypto
-# import cryptography
-# paramiko.util.log_to_file('~/.tethyscluster/logs/paramiko.log')
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
 

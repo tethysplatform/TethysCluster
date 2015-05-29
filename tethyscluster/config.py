@@ -30,10 +30,10 @@ from tethyscluster import exception
 from tethyscluster.cluster import Cluster
 from tethyscluster.utils import AttributeDict
 
-from tethyscluster.logger import log, configure_sc_logging
+from tethyscluster.logger import log, configure_tc_logging
 
-DEBUG_CONFIG = True
-configure_sc_logging()
+DEBUG_CONFIG = False
+configure_tc_logging()
 
 
 def get_easy_cloud(config_file=None, cache=False, cloud_provider=None):
@@ -663,8 +663,7 @@ class TethysClusterConfig(object):
             no_azure = True
 
         if no_aws and no_azure:
-            log.warn("No [aws info] section found in the config!")
-            log.warn("No [azure info] section found in the config!")
+            log.info("No [aws info] nor [azure info] section found in the config!")
 
 
 

@@ -100,9 +100,9 @@ class EasyAzure(object):
     @property
     def subscription_name(self):
         if not self._subscription_name:
-            subscription_name = self.conn.get_subscription().subscription_name
+            subscription_name = self.conn.get_subscription().subscription_name.replace(' ', '-')
             self._subscription_name = subscription_name
-        return self._subscription_name
+        return base64.b64encode(self.subscription_id)
 
 class EasySMS(EasyAzure):
     def __init__(self, subscription_id, certificate_path,
@@ -653,7 +653,7 @@ class EasySMS(EasyAzure):
         from userdata import unbundle_userdata
         user_data = unbundle_userdata(user_data)
 
-        aliases = user_data['_tc_aliases.txt'].split('\n')[-2:]
+        aliases = user_data['_tc_aliases.txt'].split('\n')[2:]
 
         for alias in aliases:
             # print alias
@@ -1129,9 +1129,6 @@ class Instance(object):
         self.role = role
         self.service_properties = easy_sms.conn.get_hosted_service_properties(service.service_name,
                                                                       True).hosted_service_properties
-        self.ports = dict()
-        for endpoint in role_instance.instance_endpoints:
-            self.ports[endpoint.name] = int(endpoint.public_port)
 
         self.id = (service.service_name, deployment.name, role.role_name)
         self.public_dns_name = deployment.url
@@ -1160,7 +1157,7 @@ class Instance(object):
         self.subnet_id = None
         self.vpc_id = None
         self.private_ip_address = role_instance.ip_address
-        self.ip_address = role_instance.instance_endpoints[0].vip
+        self.ip_address = None
         self.platform = role.os_virtual_hard_disk.os.lower()
         self.root_device_name = None
         self.root_device_type = None
@@ -1170,6 +1167,12 @@ class Instance(object):
         self.interfaces = None
         self.ebs_optimized = None
         self.instance_profile = None
+
+        self.ports = dict()
+        if role_instance.instance_endpoints:
+            for endpoint in role_instance.instance_endpoints:
+                self.ports[endpoint.name] = int(endpoint.public_port)
+            self.ip_address = role_instance.instance_endpoints[0].vip
 
         self.connection = easy_sms
         self.dns_name = self.ip_address #for some reason ssh not working with: deployment.url
@@ -1216,15 +1219,19 @@ if __name__ == "__main__":
 
     class TestAzureUtils(unittest.TestCase):
 
-        subscription_id = '4477d6f7-b8e4-4bcd-a7ff-c34d1d37238c'
-        certificate_path = '/Users/sdc50/.tethyscluster/Azpas300EF16037.pem'
+        from tethyscluster.config import TethysClusterConfig
+        from tethyscluster.logger import configure_tc_logging
 
-        easySMS = EasySMS(subscription_id, certificate_path, location = 'West US')
+        configure_tc_logging(use_console=True)
+        cfg = TethysClusterConfig().load()
+
+        easySMS = cfg.get_easy_sms()
+
 
         def test_regions(self):
             # print self.easySMS.list_regions()
             # print self.easySMS.region.name
-            region = 'West US'
+            region = 'East US 2'
             self.easySMS.connect_to_region(region)
             expected = region
             actual = self.easySMS.region.name

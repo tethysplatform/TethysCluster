@@ -326,7 +326,7 @@ def warn_debug_file_moved():
 def main():
     try:
         static.create_tc_config_dirs()
-        logger.configure_sc_logging()
+        logger.configure_tc_logging(use_console=True)
         warn_debug_file_moved()
         TethysClusterCLI().main()
     except KeyboardInterrupt:

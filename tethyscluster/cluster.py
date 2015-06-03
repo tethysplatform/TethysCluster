@@ -2275,7 +2275,9 @@ if __name__ == "__main__":
     from tethyscluster.config import TethysClusterConfig
     from tethyscluster.cluster import ClusterManager
     import azure
+    from tethyscluster.logger import configure_tc_logging
 
+    configure_tc_logging(use_console=True)
     cfg = TethysClusterConfig().load()
     cm = ClusterManager(cfg)
     sc = cm.get_default_template_cluster('test')

@@ -57,7 +57,7 @@ def create_tc_config_dirs():
     __makedirs(TETHYSCLUSTER_LOG_DIR)
 
 
-VERSION = '0.1.5'
+VERSION = '0.1.6'
 PID = os.getpid()
 TMP_DIR = tempfile.gettempdir()
 if os.path.exists("/tmp"):
@@ -306,7 +306,7 @@ AZURE_SETTINGS = {
     # 'aws_ec2_path': (str, False, '/', None, None),
     # 'aws_s3_path': (str, False, '/', None, None),
     # 'aws_is_secure': (bool, False, True, None, None),
-    # 'aws_region_name': (str, False, None, None, None),
+    'location': (str, False, None, None, None),
     # 'aws_region_host': (str, False, None, None, None),
     # 'aws_s3_host': (str, False, None, None, None),
     # 'aws_proxy': (str, False, None, None, None),

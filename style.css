@@ -30,6 +30,28 @@ header .nav{
     color: #ffffff;
 }
 
+#logo-wrapper{
+    background-color: #fff;
+    height: 200px;
+    width: 200px;
+    border-radius: 100px;
+    display: inline-block;
+}
+
+#logo{
+    height: 150px;
+    margin-left: 20px;
+    margin-top: 30px;
+}
+
+#banner-title{
+    display: inline;
+    font-size: 3em;
+    padding-left: 20px;
+    padding-top: 20px;
+    /*vertical-align: top;*/
+}
+
 article{
     padding: 50px;
     margin: auto;

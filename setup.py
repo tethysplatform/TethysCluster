@@ -85,7 +85,7 @@ try:
                                     'iptools==0.6.1',
                                     'optcomplete==1.2-devel',
                                     'iso8601==0.1.8',
-                                    'pyOpenSSL==0.14',
+                                    'pyOpenSSL==17.5.0',
                                     'azure==0.10.0'],
                  include_package_data=True,
                  entry_points=dict(console_scripts=console_scripts),

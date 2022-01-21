@@ -12,7 +12,7 @@ iso8601==0.1.8
 pyOpenSSL==0.14
 azure==0.10.0
 # optional deps
-ipython==1.1.0 # needed for shell command
+ipython==7.16.3 # needed for shell command
 # required for git-hooks and check.py
 pep8==1.4.6
 pyflakes==0.7.3

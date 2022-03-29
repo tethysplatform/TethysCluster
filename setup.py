@@ -76,7 +76,7 @@ try:
                                  "pytest"],
                  cmdclass={"test": PyTest},
                  install_requires= ['boto==2.25.0',
-                                    'paramiko==1.15.2',
+                                    'paramiko==2.10.1',
                                     'scp==0.7.1',
                                     'workerpool==0.9.2',
                                     'Jinja2==2.7.2',
